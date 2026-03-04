@@ -698,18 +698,3 @@ Includes:
 
 **Status**: v1.0.1 — proxy verified, mesh serial active, 80+ nodes visible | **Maintained by**: [@gnarzilla](https://github.com/gnarzilla) | [deadlight.boo](https://deadlight.boo)
 ```
-
-## Key Changes from Original
-
-| Section | What Changed |
-|---|---|
-| **Overview** | Added "live mesh visibility" bullet |
-| **Features** | Added serial API handshake, live mesh visibility, auto-detect node ID, HTTP/1.1 ALPN |
-| **Prerequisites** | Added json-glib-1.0, Python/nanopb, meshtastic CLI as optional |
-| **Getting Started** | Rewrote with absolute cert paths, added expected startup output, added WSL section |
-| **Config** | Added `custom_port = 100`, `mesh_node_id = 0` for auto-detect, absolute path warning |
-| **How It Works** | Added startup sequence, serial framing diagram, packet type table |
-| **Hardware** | Added tested hardware table with verified Wio Tracker |
-| **Roadmap** | Added v1.0.1 section with everything verified tonight, reorganized v1.1 |
-| **Build Details** | New section with dependencies and build output |
-| **Status line** | Updated to "v1.0.1 — proxy verified, mesh serial active, 80+ nodes visible" |
