@@ -49,17 +49,18 @@
  * We avoid a full nanopb dependency in the sim by hand-encoding
  * the fields we actually need. The real plugin uses nanopb.
  *
- * Meshtastic MeshPacket (simplified):
- *   field 1 (from)      : uint32  varint
- *   field 3 (channel)   : uint32  varint
- *   field 6 (hop_limit) : uint32  varint
- *   field 8 (id)        : uint32  varint
- *   field 2 (decoded)   : message (Data)
- *     field 1 (portnum) : uint32  varint
- *     field 3 (payload) : bytes
+ * Meshtastic MeshPacket (from mesh.proto):
+ *   field 1  (from)       : uint32  varint
+ *   field 4  (decoded)    : message (Data)   <-- oneof payload_variant, tag 4
+ *   field 6  (hop_limit)  : uint32  varint
+ *   field 8  (id)         : uint32  varint
+ *
+ * Meshtastic Data (from mesh.proto):
+ *   field 1  (portnum)    : uint32  varint
+ *   field 2  (payload)    : bytes            <-- field 2, not 3
  *
  * FromRadio wrapper:
- *   field 2 (packet)    : message (MeshPacket)
+ *   field 2  (packet)     : message (MeshPacket)
  * ───────────────────────────────────────────────────────────── */
 
 static size_t pb_encode_varint(uint8_t *buf, uint64_t val) {
@@ -96,14 +97,16 @@ static size_t pb_encode_tag_message(uint8_t *buf, uint32_t field,
 /**
  * Encode a Data message (portnum + payload bytes).
  * Returns bytes written into @buf.
+ *
+ * Data proto fields: portnum=1, payload=2
  */
 static size_t encode_data_msg(uint8_t *buf, size_t buf_len,
                                uint32_t portnum,
                                const uint8_t *payload, size_t payload_len) {
     (void)buf_len;
     size_t n = 0;
-    n += pb_encode_tag_varint(buf + n, 1, portnum);          /* field 1: portnum */
-    n += pb_encode_tag_bytes(buf + n, 3, payload, payload_len); /* field 3: payload */
+    n += pb_encode_tag_varint(buf + n, 1, portnum);             /* field 1: portnum */
+    n += pb_encode_tag_bytes(buf + n, 2, payload, payload_len); /* field 2: payload */
     return n;
 }
 
@@ -111,6 +114,8 @@ static size_t encode_data_msg(uint8_t *buf, size_t buf_len,
  * Encode a MeshPacket and wrap it in a FromRadio.
  * Writes the complete framed serial bytes into @out_frame.
  * Returns total bytes written (including framing), 0 on error.
+ *
+ * MeshPacket.decoded is oneof payload_variant, tag 4.
  */
 static size_t build_from_radio_frame(uint8_t *out_frame, size_t out_len,
                                       uint32_t from_node, uint32_t session_id,
@@ -126,10 +131,10 @@ static size_t build_from_radio_frame(uint8_t *out_frame, size_t out_len,
 
     /* Encode MeshPacket */
     size_t pkt_len = 0;
-    pkt_len += pb_encode_tag_varint(packet_buf + pkt_len, 1, from_node);   /* from    */
-    pkt_len += pb_encode_tag_varint(packet_buf + pkt_len, 8, session_id);  /* id      */
+    pkt_len += pb_encode_tag_varint(packet_buf + pkt_len, 1, from_node);   /* from      */
+    pkt_len += pb_encode_tag_varint(packet_buf + pkt_len, 8, session_id);  /* id        */
     pkt_len += pb_encode_tag_varint(packet_buf + pkt_len, 6, hop_limit);   /* hop_limit */
-    pkt_len += pb_encode_tag_message(packet_buf + pkt_len, 2,              /* decoded */
+    pkt_len += pb_encode_tag_message(packet_buf + pkt_len, 4,              /* decoded — tag 4 */
                                       data_buf, data_len);
 
     /* Wrap in FromRadio (field 2 = packet) */
@@ -416,7 +421,7 @@ static void cmd_http(const char *args) {
     char url[512] = {0};
 
     if (sscanf(args, "%x %511s", &node_id, url) != 2) {
-        fprintf(stderr, "[sim] usage: http <node_id_hex> <url>\n");
+        fprintf(stderr, "[sim] usage: http <node_hex> <url>\n");
         return;
     }
 
@@ -431,7 +436,7 @@ static void cmd_http(const char *args) {
 
     fprintf(stderr, "[sim] Sending HTTP GET for %s (%d bytes)\n", url, req_len);
 
-    /* Fragment into 220-byte chunks and send each as a separate frame */
+    /* Fragment into 220-byte chunks with deadmesh chunk header */
     int total_chunks = (req_len + 219) / 220;
 
     pthread_mutex_lock(&sim_mutex);
@@ -442,7 +447,7 @@ static void cmd_http(const char *args) {
             int offset    = i * 220;
             int chunk_len = (req_len - offset < 220) ? req_len - offset : 220;
 
-            /* Simple chunk header: seq(4) + total(4) + data */
+            /* deadmesh chunk header: seq(4 LE) + total(4 LE) + data */
             uint8_t chunk_buf[220 + 8];
             uint32_t seq   = (uint32_t)i;
             uint32_t total = (uint32_t)total_chunks;
@@ -507,7 +512,7 @@ static void cmd_status(void) {
         SimSession *s = &sim.sessions[i];
         if (!s->active) continue;
         fprintf(stderr, "[sim]     [%d] node=%08x session=%08x  "
-                "pkt↑%lu ↓%lu  bytes↑%lu ↓%lu\n",
+                "pkt\u2191%lu \u2193%lu  bytes\u2191%lu \u2193%lu\n",
                 i, s->node_id, s->session_id,
                 s->packets_sent, s->packets_recv,
                 s->bytes_sent, s->bytes_recv);
@@ -556,7 +561,7 @@ int main(int argc, char *argv[]) {
 
     /* Defaults */
     if (sim.hop_limit == 0) sim.hop_limit = 3;
-    sim.running        = true;
+    sim.running         = true;
     sim.next_session_id = 1;
     srand((unsigned)time(NULL));
     mesh_frame_reader_init(&sim.reader);

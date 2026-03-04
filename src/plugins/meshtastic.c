@@ -122,7 +122,7 @@ static bool payload_encode_cb(pb_ostream_t *stream,
 }
 
 static bool payload_decode_cb(pb_istream_t *stream,
-                               const pb_field_t *field,
+                               const pb_field_t *field G_GNUC_UNUSED,
                                void **arg)
 {
     PbDecodeCtx *ctx = *arg;
@@ -141,6 +141,30 @@ static bool payload_decode_cb(pb_istream_t *stream,
         return true;
     }
     return pb_read(stream, ctx->buf, ctx->len);
+}
+
+
+typedef struct {
+    char   buf[384];
+} PbStringCtx;
+
+static bool string_decode_cb(pb_istream_t *stream,
+                              const pb_field_t *field G_GNUC_UNUSED,
+                              void **arg)
+{
+    PbStringCtx *ctx = *arg;
+    size_t len = stream->bytes_left;
+    if (len >= sizeof(ctx->buf)) len = sizeof(ctx->buf) - 1;
+    if (!pb_read(stream, (pb_byte_t *)ctx->buf, len)) return false;
+    ctx->buf[len] = '\0';
+    /* drain any remainder */
+    uint8_t discard[64];
+    while (stream->bytes_left > 0) {
+        size_t n = stream->bytes_left < sizeof(discard)
+                 ? stream->bytes_left : sizeof(discard);
+        if (!pb_read(stream, discard, n)) return false;
+    }
+    return true;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -419,6 +443,13 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
               .payload_variant.decoded
               .payload.arg = &decoded_payload;
 
+    /* Pre-wire decode callback for LogRecord.message (also a callback field) */
+    PbStringCtx log_message = {0};
+    from_radio.payload_variant.log_record
+              .message.funcs.decode = string_decode_cb;
+    from_radio.payload_variant.log_record
+              .message.arg = &log_message;
+
     pb_istream_t istream = pb_istream_from_buffer(frame->payload, frame->len);
 
     if (!pb_decode(&istream, meshtastic_FromRadio_fields, &from_radio)) {
@@ -432,7 +463,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
         case meshtastic_FromRadio_packet_tag: {
             meshtastic_MeshPacket *pkt = &from_radio.payload_variant.packet;
             if (pkt->which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
-                g_info("Meshtastic: packet from %08x port=%d len=%u %s",
+                g_info("Meshtastic: packet from %08x port=%d len=%zu %s",
                        pkt->from,
                        pkt->payload_variant.decoded.portnum,
                        decoded_payload.len,
@@ -449,19 +480,19 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
 
                 /* Position updates */
                 if (pkt->payload_variant.decoded.portnum == meshtastic_PortNum_POSITION_APP) {
-                    g_debug("Meshtastic: POSITION from %08x (%u bytes)",
+                    g_debug("Meshtastic: POSITION from %08x (%zu bytes)",
                             pkt->from, decoded_payload.len);
                 }
 
                 /* Telemetry */
                 if (pkt->payload_variant.decoded.portnum == meshtastic_PortNum_TELEMETRY_APP) {
-                    g_debug("Meshtastic: TELEMETRY from %08x (%u bytes)",
+                    g_debug("Meshtastic: TELEMETRY from %08x (%zu bytes)",
                             pkt->from, decoded_payload.len);
                 }
 
                 /* NodeInfo */
                 if (pkt->payload_variant.decoded.portnum == meshtastic_PortNum_NODEINFO_APP) {
-                    g_debug("Meshtastic: NODEINFO from %08x (%u bytes)",
+                    g_debug("Meshtastic: NODEINFO from %08x (%zu bytes)",
                             pkt->from, decoded_payload.len);
                 }
             } else {
@@ -487,8 +518,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
             g_debug("Meshtastic: device config received");
             break;
         case meshtastic_FromRadio_log_record_tag:
-            g_debug("Meshtastic: device log: %s",
-                    from_radio.payload_variant.log_record.message);
+            g_debug("Meshtastic: device log: %s", log_message.buf);
             break;
         default:
             g_debug("Meshtastic: FromRadio variant %d",
