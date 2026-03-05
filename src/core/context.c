@@ -19,7 +19,13 @@ DeadlightContext *deadlight_context_new(void) {
     
     // Initialize plugin data storage
     ctx->plugins_data = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
-    
+
+    // Initialize mesh node table — keyed by node_id (uint32 as pointer),
+    // values are MeshNode* allocated with g_new0 and freed with g_free.
+    ctx->node_table = g_hash_table_new_full(
+        g_direct_hash, g_direct_equal, NULL, g_free);
+    g_mutex_init(&ctx->node_table_mutex);
+
     // Initialize statistics
     ctx->total_connections = 0;
     ctx->active_connections = 0;
@@ -65,7 +71,14 @@ void deadlight_context_free(DeadlightContext *ctx) {
     if (ctx->plugins_data) {
         g_hash_table_destroy(ctx->plugins_data);
     }
-    
+
+    // Clean up mesh node table
+    if (ctx->node_table) {
+        g_hash_table_destroy(ctx->node_table);
+        ctx->node_table = NULL;
+    }
+    g_mutex_clear(&ctx->node_table_mutex);
+
     // Stop worker pool
     if (ctx->worker_pool) {
         g_thread_pool_free(ctx->worker_pool, TRUE, TRUE);

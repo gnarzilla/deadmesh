@@ -9,6 +9,7 @@
 
 
 static enum MHD_Result handle_api_connections(DeadlightContext *context, struct MHD_Connection *conn, const char *method);
+static enum MHD_Result handle_api_nodes(DeadlightContext *context, struct MHD_Connection *conn, const char *method);
 
 /* ---------- Simple JSON helpers ---------- */
 static int json_response(struct MHD_Connection *conn, const char *json)
@@ -17,6 +18,7 @@ static int json_response(struct MHD_Connection *conn, const char *json)
                                                                (void *)json,
                                                                MHD_RESPMEM_MUST_COPY);
     MHD_add_response_header(resp, "Content-Type", "application/json");
+    MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
     int ret = MHD_queue_response(conn, MHD_HTTP_OK, resp);
     MHD_destroy_response(resp);
     return ret;
@@ -31,7 +33,7 @@ static int handle_static_file(struct MHD_Connection *conn,
     struct MHD_Response *resp = MHD_create_response_from_buffer(
         len, (void *)data, MHD_RESPMEM_MUST_COPY);
     MHD_add_response_header(resp, "Content-Type", mime_type);
-    MHD_add_response_header(resp, "Cache-Control", "public, max-age=31536000"); // Cache 1 year
+    MHD_add_response_header(resp, "Cache-Control", "public, max-age=31536000");
     int ret = MHD_queue_response(conn, MHD_HTTP_OK, resp);
     MHD_destroy_response(resp);
     return ret;
@@ -49,7 +51,6 @@ handle_api_status(DeadlightContext *context, struct MHD_Connection *conn, const 
 
     g_mutex_lock(&context->stats_mutex);
 
-    // --- Critical Section: Read all shared data ---
     double uptime = g_timer_elapsed(context->uptime_timer, NULL);
     guint64 active_conn = context->active_connections;
     guint64 total_conn = context->total_connections;
@@ -58,16 +59,13 @@ handle_api_status(DeadlightContext *context, struct MHD_Connection *conn, const 
     
     g_mutex_unlock(&context->stats_mutex);
 
-    // --- Build the JSON string from local copies ---
     gchar *bytes_str = deadlight_format_bytes(bytes);
 
-    // All of these have a trailing comma because they are not the last item
     g_string_append_printf(json_str, "\"version\": \"%s\",", DEADLIGHT_VERSION_STRING);
     g_string_append_printf(json_str, "\"uptime_seconds\": %.2f,", uptime);
     g_string_append_printf(json_str, "\"connections_active\": %" G_GUINT64_FORMAT ",", active_conn);
     g_string_append_printf(json_str, "\"connections_total\": %" G_GUINT64_FORMAT ",", total_conn);
     g_string_append_printf(json_str, "\"bytes_transferred\": %" G_GUINT64_FORMAT ",", bytes);
-
     g_string_append_printf(json_str, "\"bytes_transferred_formatted\": \"%s\",", bytes_str);
 
     g_string_append(json_str, "\"plugins\": [");
@@ -75,25 +73,100 @@ handle_api_status(DeadlightContext *context, struct MHD_Connection *conn, const 
         GList *iterator = plugin_names;
         gboolean first = TRUE;
         while (iterator) {
-            if (!first) {
-                g_string_append(json_str, ",");
-            }
+            if (!first) g_string_append(json_str, ",");
             g_string_append_printf(json_str, "\"%s\"", (gchar*)iterator->data);
             first = FALSE;
             iterator = g_list_next(iterator);
         }
         g_list_free_full(plugin_names, g_free);
     }
-    g_string_append(json_str, "]"); // End of array
-
-    // The final closing brace for the object
-    g_string_append(json_str, "}");
+    g_string_append(json_str, "]}");
 
     enum MHD_Result ret = json_response(conn, json_str->str);
 
     g_free(bytes_str);
     g_string_free(json_str, TRUE);
     
+    return ret;
+}
+
+/* ---------- API: /api/nodes — mesh node table ---------- */
+static enum MHD_Result
+handle_api_nodes(DeadlightContext *context, struct MHD_Connection *conn, const char *method)
+{
+    if (strcmp(method, "GET") != 0) return MHD_NO;
+
+    GString *json_str = g_string_new("{\"nodes\":[");
+    gboolean first = TRUE;
+
+    gint64 now = g_get_real_time() / G_USEC_PER_SEC;
+
+    g_mutex_lock(&context->node_table_mutex);
+
+    if (context->node_table) {
+        GHashTableIter iter;
+        gpointer key, value;
+        g_hash_table_iter_init(&iter, context->node_table);
+
+        while (g_hash_table_iter_next(&iter, &key, &value)) {
+            MeshNode *node = (MeshNode *)value;
+            if (!first) g_string_append(json_str, ",");
+            first = FALSE;
+
+            /* Seconds since last heard — -1 if never updated this session */
+            gint64 age = (node->last_heard > 0) ? (now - node->last_heard) : -1;
+
+            /* Escape names defensively — they come from radio and may have
+             * unexpected characters                                         */
+            gchar *short_esc = g_strescape(node->short_name, NULL);
+            gchar *long_esc  = g_strescape(node->long_name,  NULL);
+
+            g_string_append_printf(json_str,
+                "{"
+                "\"id\":\"%08x\","
+                "\"short\":\"%s\","
+                "\"long\":\"%s\","
+                "\"hops\":%d,"
+                "\"snr\":%.1f,"
+                "\"last_heard\":%" G_GINT64_FORMAT ","   /* unix timestamp */
+                "\"age_s\":%" G_GINT64_FORMAT ","        /* seconds ago    */
+                "\"battery\":%u,"
+                "\"has_position\":%s,"
+                "\"lat\":%.6f,"
+                "\"lon\":%.6f,"
+                "\"alt\":%d,"
+                "\"is_local\":%s"
+                "}",
+                node->node_id,
+                short_esc,
+                long_esc,
+                node->hops_away,
+                (double)node->snr,
+                node->last_heard,
+                age,
+                (unsigned)node->battery_level,
+                node->has_position ? "true" : "false",
+                node->latitude,
+                node->longitude,
+                node->altitude,
+                node->is_local   ? "true" : "false"
+            );
+
+            g_free(short_esc);
+            g_free(long_esc);
+        }
+    }
+
+    /* Also expose total count for the stat card */
+    guint node_count = context->node_table
+        ? g_hash_table_size(context->node_table) : 0;
+
+    g_mutex_unlock(&context->node_table_mutex);
+
+    g_string_append_printf(json_str, "],\"total\":%u}", node_count);
+
+    enum MHD_Result ret = json_response(conn, json_str->str);
+    g_string_free(json_str, TRUE);
     return ret;
 }
 
@@ -121,34 +194,31 @@ request_handler(void *cls,
 
     DeadlightContext *context = cls;
     
-    // Root
-    if (strcmp(url, "/") == 0 && strcmp(method, "GET") == 0) {
+    if (strcmp(url, "/") == 0 && strcmp(method, "GET") == 0)
         return handle_root(conn);
-    }
-    
-    // Favicons
-    else if (strcmp(url, "/favicon.ico") == 0 && strcmp(method, "GET") == 0) {
+
+    else if (strcmp(url, "/favicon.ico") == 0 && strcmp(method, "GET") == 0)
         return handle_static_file(conn,
                                  (const char *)src_ui_favicon_ico,
                                  src_ui_favicon_ico_len,
                                  "image/x-icon");
-    }
-    else if (strcmp(url, "/favicon.png") == 0 && strcmp(method, "GET") == 0) {
+
+    else if (strcmp(url, "/favicon.png") == 0 && strcmp(method, "GET") == 0)
         return handle_static_file(conn,
                                  (const char *)src_ui_favicon_png,
                                  src_ui_favicon_png_len,
                                  "image/png");
-    }
-    
-    // APIs
-    else if (strcmp(url, "/api/status") == 0 && strcmp(method, "GET") == 0) {
+
+    else if (strcmp(url, "/api/status") == 0 && strcmp(method, "GET") == 0)
         return handle_api_status(context, conn, method);
-    }
-    else if (strcmp(url, "/api/connections") == 0 && strcmp(method, "GET") == 0) {
+
+    else if (strcmp(url, "/api/connections") == 0 && strcmp(method, "GET") == 0)
         return handle_api_connections(context, conn, method);
-    }
- 
-    /* 404 Not Found */
+
+    else if (strcmp(url, "/api/nodes") == 0 && strcmp(method, "GET") == 0)
+        return handle_api_nodes(context, conn, method);
+
+    /* 404 */
     struct MHD_Response *resp = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
     int rc = MHD_queue_response(conn, MHD_HTTP_NOT_FOUND, resp);
     MHD_destroy_response(resp);
@@ -166,14 +236,13 @@ void start_ui_server(DeadlightContext *context)
                                  ui_port,
                                  NULL,
                                  NULL,
-                                 (MHD_AccessHandlerCallback) &request_handler, // Cast for strict compilers
+                                 (MHD_AccessHandlerCallback) &request_handler,
                                  context, 
                                  MHD_OPTION_END);
-    if (!ui_daemon) {
+    if (!ui_daemon)
         g_error("Failed to start UI daemon on port %u", ui_port);
-    } else {
+    else
         g_info("UI server listening on http://127.0.0.1:%u", ui_port);
-    }
 }
 
 void stop_ui_server(void)
@@ -188,14 +257,11 @@ void stop_ui_server(void)
 static enum MHD_Result
 handle_api_connections(DeadlightContext *context, struct MHD_Connection *conn, const char *method)
 {
-    if (strcmp(method, "GET") != 0) {
-        return MHD_NO;
-    }
+    if (strcmp(method, "GET") != 0) return MHD_NO;
 
     GString *json_str = g_string_new("[");
     gboolean first = TRUE;
 
-    // Lock the mutex to safely iterate over the connections hash table
     g_mutex_lock(&context->stats_mutex);
 
     if (context->connections) {
@@ -204,12 +270,7 @@ handle_api_connections(DeadlightContext *context, struct MHD_Connection *conn, c
         g_hash_table_iter_init(&iter, context->connections);
         while (g_hash_table_iter_next(&iter, &key, &value)) {
             DeadlightConnection *d_conn = (DeadlightConnection *)value;
-
-            if (!first) {
-                g_string_append(json_str, ",");
-            }
-            
-            // Extract the data for the JSON response
+            if (!first) g_string_append(json_str, ",");
             g_string_append_printf(json_str, "{"
                 "\"id\": %" G_GUINT64_FORMAT ","
                 "\"remote\": \"%s\","
@@ -227,13 +288,11 @@ handle_api_connections(DeadlightContext *context, struct MHD_Connection *conn, c
         }
     }
 
-    // Unlock the mutex as soon as we're done with the shared data
     g_mutex_unlock(&context->stats_mutex);
 
     g_string_append(json_str, "]");
 
     enum MHD_Result ret = json_response(conn, json_str->str);
     g_string_free(json_str, TRUE);
-
     return ret;
 }

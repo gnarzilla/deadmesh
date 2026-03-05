@@ -145,7 +145,7 @@ typedef struct _DeadlightPluginManager  DeadlightPluginManager;
 typedef struct _ConnectionPool          ConnectionPool;
 typedef struct _DeadlightConnInfo       DeadlightConnInfo;
 typedef struct _DeadlightVPNManager     DeadlightVPNManager;
-typedef struct _DeadlightMeshManager    DeadlightMeshManager;   /* deadmesh-specific */
+typedef struct _DeadlightMeshManager    DeadlightMeshManager;  
 
 /* ═══════════════════════════════════════════════════════════
  * Protocol handler vtable
@@ -211,6 +211,40 @@ struct _DeadlightMeshManager {
     GMutex              reassembly_mutex;
 };
 
+typedef struct {
+    uint32_t  node_id;                /* Meshtastic node number (hex ID)  */
+    char      short_name[5];          /* e.g. "CERN" — max 4 chars + NUL  */
+    char      long_name[40];          /* e.g. "Cernunnos"                 */
+    int32_t   hops_away;              /* -1 = unknown                     */
+    float     snr;                    /* last heard SNR (dB)              */
+    double    latitude;               /* 0.0 = unknown                    */
+    double    longitude;
+    int32_t   altitude;
+    uint8_t   battery_level;          /* 0–100, 101 = plugged in          */
+    gboolean  has_position;
+    gboolean  has_telemetry;
+    gint64    last_heard;             /* g_get_real_time() / 1e6 (unix s) */
+    gboolean  is_local;               /* TRUE for our own node            */
+} MeshNode;
+
+/*
+ * ADD TO DeadlightContext struct:
+ *
+ *   GHashTable  *node_table;        // uint32 node_id -> MeshNode*
+ *   GMutex       node_table_mutex;
+ *
+ * ADD TO context init (wherever other mutexes are initialised):
+ *
+ *   context->node_table = g_hash_table_new_full(
+ *       g_direct_hash, g_direct_equal, NULL, g_free);
+ *   g_mutex_init(&context->node_table_mutex);
+ *
+ * ADD TO context cleanup:
+ *
+ *   g_mutex_clear(&context->node_table_mutex);
+ *   g_hash_table_destroy(context->node_table);
+ */
+
 struct _DeadlightContext {
     GMainLoop              *main_loop;
     DeadlightConfig        *config;
@@ -219,6 +253,8 @@ struct _DeadlightContext {
     DeadlightPluginManager *plugins;
     DeadlightVPNManager    *vpn;
     DeadlightMeshManager   *mesh;          /* NULL when mesh transport unused */
+    GHashTable             *node_table;     
+    GMutex                 node_table_mutex;
     GHashTable             *plugins_data;
     GHashTable             *connections;
     GHashTable             *certificates;

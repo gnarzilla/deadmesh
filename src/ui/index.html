@@ -18,14 +18,14 @@
             --accent: #22c55e;
             --accent-dim: #15803d;
             --log-bg: #050805;
-
-            /* Log Colors — shifted green-ward to match palette */
             --l-info: #34d399;
             --l-warn: #fbbf24;
             --l-err:  #f87171;
             --l-debug: #374a39;
             --l-time: #4ade80;
         }
+
+        * { box-sizing: border-box; }
 
         body {
             background-color: var(--bg);
@@ -34,105 +34,194 @@
             margin: 0;
             padding: 20px;
             height: 100vh;
-            box-sizing: border-box;
             display: flex;
             flex-direction: column;
             gap: 20px;
-            /* Subtle scanline texture to evoke RF/radio feel */
             background-image: repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 2px,
-                rgba(34, 197, 94, 0.015) 2px,
-                rgba(34, 197, 94, 0.015) 4px
+                0deg, transparent, transparent 2px,
+                rgba(34,197,94,0.015) 2px, rgba(34,197,94,0.015) 4px
             );
         }
 
-        /* HEADER */
+        /* ── HEADER ── */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border);
             padding-bottom: 15px;
+            flex-shrink: 0;
         }
         h1 { margin: 0; font-size: 20px; letter-spacing: -1px; }
         .badge { 
-            background: var(--accent);
-            color: #000; 
-            padding: 2px 8px; 
-            border-radius: 4px; 
-            font-size: 12px; 
-            font-weight: bold;
+            background: var(--accent); color: #000; 
+            padding: 2px 8px; border-radius: 4px; 
+            font-size: 12px; font-weight: bold;
         }
 
-        /* STATS GRID */
+        /* ── STATS GRID ── */
         .grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 15px;
+            flex-shrink: 0;
         }
         .card {
             background: var(--panel);
             border: 1px solid var(--border);
-            padding: 15px;
-            border-radius: 6px;
-            position: relative;
-            overflow: hidden;
+            padding: 15px; border-radius: 6px;
+            position: relative; overflow: hidden;
         }
-        /* Subtle left accent bar on cards */
         .card::before {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; bottom: 0;
-            width: 2px;
+            content: ''; position: absolute;
+            left: 0; top: 0; bottom: 0; width: 2px;
             background: var(--accent-dim);
         }
         .card-label { 
-            color: var(--text-dim); 
-            font-size: 11px; 
-            text-transform: uppercase; 
-            letter-spacing: 0.05em;
-            margin-bottom: 5px; 
-            display: block;
+            color: var(--text-dim); font-size: 11px; 
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-bottom: 5px; display: block;
         }
         .card-value { font-size: 24px; font-weight: 600; color: var(--accent); }
 
-        /* WORKSPACE */
+        /* ── WORKSPACE ── */
         .workspace {
             display: flex;
             flex: 1;
             gap: 20px;
             overflow: hidden;
+            min-height: 0;
         }
 
-        /* MESH LINKS PANEL (Left) */
-        .conn-panel {
+        /* ── LEFT PANEL — TABBED ── */
+        .left-panel {
             flex: 1;
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 6px;
             display: flex;
             flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
         }
-        .panel-head {
-            padding: 10px 15px;
-            border-bottom: 1px solid var(--border);
-            font-weight: bold;
-            font-size: 12px;
+
+        .tab-bar {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .tab-btn {
+            padding: 10px 16px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .tab-btn:hover { color: var(--text-main); }
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .tab-live {
+            margin-left: auto;
+            padding: 10px 15px;
+            font-size: 10px;
             color: var(--text-dim);
             letter-spacing: 0.08em;
+            align-self: center;
         }
-        .panel-head span:first-child { color: var(--text-main); }
 
+        .tab-pane { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+        .tab-pane.active { display: flex; }
+
+        /* ── NODE TABLE ── */
+        .node-table-wrap {
+            flex: 1;
+            overflow-y: auto;
+        }
+        table.node-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        table.node-table thead {
+            position: sticky; top: 0;
+            background: var(--panel);
+            z-index: 1;
+        }
+        table.node-table th {
+            padding: 7px 10px;
+            text-align: left;
+            color: var(--text-dim);
+            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        table.node-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #0d150f;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        table.node-table tr:hover td { background: #0d1a0f; }
+
+        .node-id    { color: var(--text-dim); font-size: 10px; }
+        .node-local { color: var(--accent); font-weight: bold; }
+        .node-name  { color: var(--text-main); }
+        .node-hops  { color: var(--text-dim); text-align: center; }
+        .node-snr   { color: #6ee7b7; text-align: right; }
+        .node-age   { color: var(--text-dim); text-align: right; }
+        .node-bat   { text-align: center; }
+
+        .bat-bar {
+            display: inline-block;
+            width: 36px; height: 8px;
+            background: #1a2e1d;
+            border-radius: 2px;
+            vertical-align: middle;
+            overflow: hidden;
+            margin-right: 4px;
+        }
+        .bat-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+        .bat-high   { background: var(--accent); }
+        .bat-med    { background: #fbbf24; }
+        .bat-low    { background: #f87171; }
+        .bat-plug   { background: #60a5fa; }
+
+        .pos-dot {
+            display: inline-block;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            vertical-align: middle;
+        }
+        .pos-dot.has-pos { background: var(--accent); }
+
+        .node-empty {
+            padding: 30px;
+            text-align: center;
+            opacity: 0.4;
+            font-size: 12px;
+        }
+
+        /* ── LINKS PANE ── */
         .conn-list {
             overflow-y: auto;
             flex: 1;
-            padding: 0;
-            margin: 0;
+            padding: 0; margin: 0;
             list-style: none;
         }
         .conn-row {
@@ -148,7 +237,7 @@
         .conn-row .proto-tag { color: var(--text-dim); font-size: 10px; }
         .active-count { color: var(--accent); font-weight: bold; text-align: right; }
 
-        /* LOG TERMINAL (Right) */
+        /* ── LOG TERMINAL ── */
         .terminal-panel {
             flex: 2;
             background: var(--log-bg);
@@ -157,7 +246,21 @@
             display: flex;
             flex-direction: column;
             font-size: 12px;
+            min-width: 0;
         }
+        .panel-head {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border);
+            font-weight: bold;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-dim);
+            letter-spacing: 0.08em;
+            flex-shrink: 0;
+        }
+        .panel-head span:first-child { color: var(--text-main); }
         .terminal-window {
             flex: 1;
             overflow-y: auto;
@@ -165,36 +268,28 @@
             white-space: pre-wrap;
             font-family: 'Consolas', monospace;
         }
-        
         .log-line { 
-            display: block; 
-            margin-bottom: 2px; 
-            line-height: 1.4; 
-            border-left: 2px solid transparent; 
-            padding-left: 5px;
+            display: block; margin-bottom: 2px; line-height: 1.4;
+            border-left: 2px solid transparent; padding-left: 5px;
         }
         .log-line:hover { background: #0a110a; border-left-color: var(--text-dim); }
-        
-        .ts  { color: var(--l-time); opacity: 0.6; margin-right: 10px; }
-        .lvl-INFO  { color: var(--l-info);  font-weight: bold; }
-        .lvl-WARN  { color: var(--l-warn);  font-weight: bold; }
-        .lvl-ERROR { color: var(--l-err);   font-weight: bold; }
-        .lvl-DEBUG { color: var(--l-debug); }
-        .msg { color: var(--text-main); }
+        .ts          { color: var(--l-time); opacity: 0.6; margin-right: 10px; }
+        .lvl-INFO    { color: var(--l-info);  font-weight: bold; }
+        .lvl-WARN    { color: var(--l-warn);  font-weight: bold; }
+        .lvl-ERROR   { color: var(--l-err);   font-weight: bold; }
+        .lvl-DEBUG   { color: var(--l-debug); }
+        .msg         { color: var(--text-main); }
 
-        /* SCROLLBAR */
-        ::-webkit-scrollbar { width: 8px; }
+        /* ── SCROLLBARS ── */
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: var(--bg); }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
-        /* STATUS INDICATORS */
+        /* ── STATUS ── */
         .status-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 6px;
+            display: inline-block; width: 8px; height: 8px;
+            border-radius: 50%; margin-right: 6px;
             animation: pulse 2s infinite;
         }
         .status-online     { background: var(--accent); }
@@ -206,29 +301,17 @@
             50%       { opacity: 0.35; }
         }
 
-        .stream-mode {
-            font-size: 10px;
-            color: var(--text-dim);
-            margin-left: 5px;
-            letter-spacing: 0.05em;
-        }
+        .stream-mode { font-size: 10px; color: var(--text-dim); margin-left: 5px; letter-spacing: 0.05em; }
 
-        /* Antenna icon pulse ring — purely decorative */
         .icon-wrap {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 24px;
-            height: 24px;
+            position: relative; display: flex;
+            align-items: center; justify-content: center;
+            width: 24px; height: 24px;
         }
         .icon-wrap::after {
-            content: '';
-            position: absolute;
-            width: 36px; height: 36px;
-            border-radius: 50%;
-            border: 1px solid var(--accent);
-            opacity: 0;
+            content: ''; position: absolute;
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 1px solid var(--accent); opacity: 0;
             animation: sonar 3s ease-out infinite;
         }
         @keyframes sonar {
@@ -241,17 +324,13 @@
 
     <header>
         <div style="display:flex; align-items:center; gap:15px;">
-            <!-- Antenna / broadcast icon -->
             <div class="icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" 
                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                      style="color: var(--accent)">
-                    <!-- vertical mast -->
                     <line x1="12" y1="24" x2="12" y2="10"/>
-                    <!-- signal arcs -->
                     <path d="M8.5 6.5 A5 5 0 0 1 15.5 6.5"/>
                     <path d="M5.5 3.5 A9 9 0 0 1 18.5 3.5"/>
-                    <!-- base dot -->
                     <circle cx="12" cy="10" r="1.2" fill="currentColor"/>
                 </svg>
             </div>
@@ -267,7 +346,7 @@
         </div>
     </header>
 
-    <!-- METRICS -->
+    <!-- STATS — 5 cards now includes mesh node count -->
     <div class="grid">
         <div class="card">
             <span class="card-label">Active Links</span>
@@ -282,26 +361,57 @@
             <span class="card-value" id="val-bytes">--</span>
         </div>
         <div class="card">
+            <span class="card-label">Mesh Nodes</span>
+            <span class="card-value" id="val-nodes">--</span>
+        </div>
+        <div class="card">
             <span class="card-label">Gateway Uptime</span>
             <span class="card-value" id="val-uptime">--</span>
         </div>
     </div>
 
     <div class="workspace">
-        <!-- LEFT: MESH LINKS -->
-        <div class="conn-panel">
-            <div class="panel-head">
-                <span>MESH LINKS</span>
-                <span style="font-size: 10px;">LIVE</span>
+        <!-- LEFT: TABBED PANEL -->
+        <div class="left-panel">
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="nodes">Mesh Nodes</button>
+                <button class="tab-btn" data-tab="links">Proxy Links</button>
+                <span class="tab-live">LIVE</span>
             </div>
-            <ul class="conn-list" id="conn-list">
-                <li class="conn-row" style="text-align:center; display:block; opacity:0.4; padding:20px;">
-                    Awaiting mesh telemetry...
-                </li>
-            </ul>
+
+            <!-- NODES TAB -->
+            <div class="tab-pane active" id="tab-nodes">
+                <div class="node-table-wrap">
+                    <table class="node-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="id">Node</th>
+                                <th data-sort="long">Name</th>
+                                <th data-sort="hops" style="text-align:center">Hops</th>
+                                <th data-sort="snr" style="text-align:right">SNR</th>
+                                <th data-sort="battery" style="text-align:center">Bat</th>
+                                <th style="text-align:center">Pos</th>
+                                <th data-sort="last_heard" style="text-align:right">Last Heard</th>
+                            </tr>
+                        </thead>
+                        <tbody id="node-tbody">
+                            <tr><td colspan="7" class="node-empty">Awaiting mesh telemetry...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- LINKS TAB -->
+            <div class="tab-pane" id="tab-links">
+                <ul class="conn-list" id="conn-list">
+                    <li class="conn-row" style="text-align:center; display:block; opacity:0.4; padding:20px;">
+                        No active proxy links
+                    </li>
+                </ul>
+            </div>
         </div>
 
-        <!-- RIGHT: GATEWAY LOG -->
+        <!-- RIGHT: LOG -->
         <div class="terminal-panel">
             <div class="panel-head">
                 <span>GATEWAY LOG</span>
@@ -319,8 +429,10 @@
     // ═══════════════════════════════════════════════════════════════════════
     // CONFIG
     // ═══════════════════════════════════════════════════════════════════════
-    const API_BASE    = 'http://127.0.0.1:8080';
+    const API_BASE     = 'http://127.0.0.1:8080';
+    const UI_BASE      = 'http://127.0.0.1:8081';
     const SSE_ENDPOINT = API_BASE + '/api/stream';
+    const NODE_POLL_MS = 5000;
 
     // ═══════════════════════════════════════════════════════════════════════
     // STATE
@@ -331,9 +443,20 @@
     const MAX_RECONNECT_DELAY = 30000;
 
     // ═══════════════════════════════════════════════════════════════════════
+    // TABS
+    // ═══════════════════════════════════════════════════════════════════════
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════
     // UTILS
     // ═══════════════════════════════════════════════════════════════════════
-
     function formatBytes(bytes) {
         if (bytes === 0) return '0 B';
         const k = 1024;
@@ -352,6 +475,14 @@
         return `${s}s`;
     }
 
+    function formatAge(age_s) {
+        if (age_s < 0)       return '—';
+        if (age_s < 60)      return `${age_s}s`;
+        if (age_s < 3600)    return `${Math.floor(age_s/60)}m`;
+        if (age_s < 86400)   return `${Math.floor(age_s/3600)}h`;
+        return `${Math.floor(age_s/86400)}d`;
+    }
+
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -361,35 +492,160 @@
     function renderLogLine(line) {
         const regex = /^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s\[\s*([A-Z]+)\s*\]\s(.*)/;
         const match = line.match(regex);
-
         if (!match) {
             return `<div class="log-line"><span class="msg">${escapeHtml(line)}</span></div>`;
         }
-
         const [_, ts, level, msg] = match;
-
-        // Keyword highlighting — mesh-flavoured colours
         let richMsg = escapeHtml(msg)
-            .replace(/(Connection \d+)/g,              '<span style="color:#6ee7b7">$1</span>')
-            .replace(/([a-zA-Z0-9.-]+\.com:\d+)/g,    '<span style="color:#fcd34d">$1</span>')
-            .replace(/(direct:\/\/)/g,                 '<span style="color:#86efac">$1</span>')
-            .replace(/(LoRa|mesh|fragment|relay)/gi,   '<span style="color:#4ade80">$1</span>');
+            .replace(/(Connection \d+)/g,            '<span style="color:#6ee7b7">$1</span>')
+            .replace(/([a-zA-Z0-9.-]+\.com:\d+)/g,  '<span style="color:#fcd34d">$1</span>')
+            .replace(/(direct:\/\/)/g,               '<span style="color:#86efac">$1</span>')
+            .replace(/(LoRa|mesh|fragment|relay)/gi, '<span style="color:#4ade80">$1</span>')
+            .replace(/([0-9a-f]{8})/g,               '<span style="color:#a78bfa">$1</span>');
 
-        return `
-            <div class="log-line">
-                <span class="ts">${ts}</span>
-                <span class="lvl-${level.trim()}">[${level}]</span>
-                <span class="msg" style="margin-left:10px">${richMsg}</span>
-            </div>`;
+        return `<div class="log-line">
+            <span class="ts">${ts}</span>
+            <span class="lvl-${level.trim()}">[${level}]</span>
+            <span class="msg" style="margin-left:10px">${richMsg}</span>
+        </div>`;
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // NODE TABLE — SORT STATE
+    // ═══════════════════════════════════════════════════════════════════════
+    let sortCol = 'last_heard';
+    let sortDir = -1; // -1 = desc, 1 = asc
+    let cachedNodes = [];
+
+    // Wire header clicks
+    document.querySelectorAll('table.node-table th[data-sort]').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+            if (sortCol === th.dataset.sort) {
+                sortDir *= -1;
+            } else {
+                sortCol = th.dataset.sort;
+                sortDir = -1;
+            }
+            updateSortIndicators();
+            renderNodes(cachedNodes);
+        });
+    });
+
+    function updateSortIndicators() {
+        document.querySelectorAll('table.node-table th[data-sort]').forEach(th => {
+            th.style.color = '';
+            const arrow = th.querySelector('.sort-arrow');
+            if (arrow) arrow.remove();
+        });
+        const active = document.querySelector(`th[data-sort="${sortCol}"]`);
+        if (active) {
+            active.style.color = 'var(--accent)';
+            const arrow = document.createElement('span');
+            arrow.className = 'sort-arrow';
+            arrow.textContent = sortDir === -1 ? ' ▼' : ' ▲';
+            arrow.style.fontSize = '9px';
+            active.appendChild(arrow);
+        }
+    }
+    updateSortIndicators();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // NODE TABLE RENDER
+    // ═══════════════════════════════════════════════════════════════════════
+    function batteryHtml(level) {
+        if (level === 0) return '<span style="color:var(--text-dim)">—</span>';
+        if (level === 101) {
+            return `<div class="bat-bar"><div class="bat-fill bat-plug" style="width:100%"></div></div><span style="font-size:9px;color:#60a5fa">⚡</span>`;
+        }
+        const pct   = Math.min(100, Math.max(0, level));
+        const cls   = pct > 60 ? 'bat-high' : pct > 20 ? 'bat-med' : 'bat-low';
+        return `<div class="bat-bar"><div class="bat-fill ${cls}" style="width:${pct}%"></div></div><span style="font-size:9px">${pct}%</span>`;
+    }
+
+    function renderNodes(nodes) {
+        if (nodes) cachedNodes = nodes;
+        const tbody = document.getElementById('node-tbody');
+        if (!cachedNodes || cachedNodes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="node-empty">No nodes heard yet</td></tr>';
+            return;
+        }
+
+        /* Sort: local node always first, then by chosen column */
+        const sorted = [...cachedNodes].sort((a, b) => {
+            if (a.is_local !== b.is_local) return a.is_local ? -1 : 1;
+            let av = a[sortCol], bv = b[sortCol];
+            if (sortCol === 'long' || sortCol === 'short') {
+                av = (a.long || a.short || '').toLowerCase();
+                bv = (b.long || b.short || '').toLowerCase();
+            }
+            if (av === undefined || av === null) av = -Infinity;
+            if (bv === undefined || bv === null) bv = -Infinity;
+            if (av < bv) return sortDir;
+            if (av > bv) return -sortDir;
+            return 0;
+        });
+        const nodes_to_render = sorted;
+
+        const rows = nodes_to_render.map(n => {
+            const nameClass = n.is_local ? 'node-local' : 'node-name';
+            const displayName = n.long || n.short || '—';
+            const shortTag  = n.short ? `<span class="node-id">${escapeHtml(n.short)}</span> ` : '';
+            const hops      = n.hops >= 0 ? n.hops : '—';
+            const snr       = n.snr !== 0 ? n.snr.toFixed(1) + ' dB' : '—';
+            const posClass  = n.has_position ? 'has-pos' : '';
+            const posTip    = n.has_position
+                ? `title="${n.lat.toFixed(5)}, ${n.lon.toFixed(5)}"` : '';
+
+            return `<tr>
+                <td class="node-id">${n.id}${n.is_local ? ' <span style="color:var(--accent);font-size:9px">[LOCAL]</span>' : ''}</td>
+                <td>${shortTag}<span class="${nameClass}">${escapeHtml(displayName)}</span></td>
+                <td class="node-hops">${hops}</td>
+                <td class="node-snr">${snr}</td>
+                <td class="node-bat">${batteryHtml(n.battery)}</td>
+                <td style="text-align:center"><span class="pos-dot ${posClass}" ${posTip}></span></td>
+                <td class="node-age">${formatAge(n.age_s)}</td>
+            </tr>`;
+        });
+
+        tbody.innerHTML = rows.join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // NODE POLLING  — independent of SSE, hits /api/nodes every 5s
+    // ═══════════════════════════════════════════════════════════════════════
+    async function pollNodes() {
+        try {
+            const res  = await fetch(UI_BASE + '/api/nodes');
+            if (!res.ok) return;
+            const data = await res.json();
+            renderNodes(data.nodes || []);
+            document.getElementById('val-nodes').textContent = data.total ?? '—';
+        } catch (e) {
+            /* silently skip — SSE badge already indicates connectivity */
+        }
+    }
+
+    pollNodes();
+    setInterval(pollNodes, NODE_POLL_MS);
+
+    // Age column ticks every second client-side — no server round-trip needed.
+    // Recomputes age_s from last_heard timestamp and re-renders the table.
+    setInterval(() => {
+        if (!cachedNodes.length) return;
+        const now = Math.floor(Date.now() / 1000);
+        cachedNodes = cachedNodes.map(n => ({
+            ...n,
+            age_s: n.last_heard > 0 ? now - n.last_heard : -1
+        }));
+        renderNodes(null); // null = use cachedNodes as-is
+    }, 1000);
 
     // ═══════════════════════════════════════════════════════════════════════
     // STATUS BADGE
     // ═══════════════════════════════════════════════════════════════════════
-
     function updateApiStatus(status) {
         const badge = document.getElementById('api-status-badge');
-
         if (status === 'online') {
             badge.innerHTML = '<span class="status-indicator status-online"></span>STREAMING';
             badge.style.background = 'var(--accent)';
@@ -411,9 +667,8 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // DASHBOARD UPDATE
+    // DASHBOARD UPDATE (from SSE)
     // ═══════════════════════════════════════════════════════════════════════
-
     function updateDashboard(data) {
         const metrics = data.metrics;
 
@@ -423,62 +678,51 @@
         document.getElementById('val-bytes').innerText  = formatBytes(metrics.bytes_transferred);
         document.getElementById('val-uptime').innerText = formatUptime(metrics.uptime);
 
-        // Mesh links — protocol breakdown
+        /* Proxy links panel */
         const list = document.getElementById('conn-list');
         let html = '';
         let hasActive = false;
-
         for (const [proto, stats] of Object.entries(metrics.protocols)) {
             if (stats.active > 0) {
                 hasActive = true;
-                html += `
-                <li class="conn-row">
+                html += `<li class="conn-row">
                     <span class="proto-tag">LNK</span>
                     <span style="font-weight:bold">${proto}</span>
                     <span class="active-count">${stats.active} ACTIVE</span>
                 </li>`;
             }
         }
-
         list.innerHTML = hasActive
             ? html
             : '<li class="conn-row" style="opacity:0.4; justify-content:center; display:block; padding:20px; text-align:center;">No active links</li>';
 
-        // Logs — incremental append
-        const logs = data.logs || [];
-        const term = document.getElementById('terminal');
-
-        let newLogs = [];
+        /* Log lines */
+        const logs   = data.logs || [];
+        const term   = document.getElementById('terminal');
+        let newLogs  = [];
         if (lastLogLine === '') {
             newLogs = logs;
         } else {
             const idx = logs.indexOf(lastLogLine);
-            newLogs = idx !== -1 ? logs.slice(idx + 1) : logs;
+            newLogs   = idx !== -1 ? logs.slice(idx + 1) : logs;
         }
-
         if (newLogs.length > 0) {
             lastLogLine = logs[logs.length - 1];
-
             newLogs.forEach(line => {
                 const div = document.createElement('div');
                 div.innerHTML = renderLogLine(line);
                 term.appendChild(div);
             });
-
             if (document.getElementById('auto-scroll').checked) {
                 term.scrollTop = term.scrollHeight;
             }
-
-            while (term.childElementCount > 500) {
-                term.removeChild(term.firstChild);
-            }
+            while (term.childElementCount > 500) term.removeChild(term.firstChild);
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // SSE
     // ═══════════════════════════════════════════════════════════════════════
-
     function connectSSE() {
         updateApiStatus('connecting');
         eventSource = new EventSource(SSE_ENDPOINT);
@@ -509,14 +753,13 @@
     // ═══════════════════════════════════════════════════════════════════════
     // POLLING FALLBACK
     // ═══════════════════════════════════════════════════════════════════════
-
     function switchToPollingMode() {
         document.getElementById('mode-indicator').textContent = '🔄 POLLING';
         if (eventSource) { eventSource.close(); eventSource = null; }
 
         async function poll() {
             try {
-                const res  = await fetch(API_BASE + '/api/dashboard');
+                const res = await fetch(API_BASE + '/api/dashboard');
                 if (!res.ok) throw new Error(`${res.status}`);
                 updateDashboard(await res.json());
                 updateApiStatus('online');
@@ -532,7 +775,6 @@
     // ═══════════════════════════════════════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════════════════════════════════════
-
     if (typeof EventSource !== 'undefined') {
         connectSSE();
         setTimeout(() => { if (reconnectAttempts > 10) switchToPollingMode(); }, 60000);
