@@ -303,53 +303,115 @@
 
         .stream-mode { font-size: 10px; color: var(--text-dim); margin-left: 5px; letter-spacing: 0.05em; }
 
-        /* ── MESSAGE LIST ── */
-        .msg-list-wrap {
+        /* ── MESSAGE PANEL (right-side chat log) ── */
+        .msg-panel {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+        .msg-panel.active { display: flex; }
+        .msg-panel-header {
+            padding: 10px 16px 8px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .msg-panel-header .msg-channel {
+            color: var(--accent);
+            font-weight: bold;
+        }
+        .msg-panel-header .msg-count {
+            margin-left: auto;
+            opacity: 0.5;
+        }
+        .msg-scroll {
             flex: 1;
             overflow-y: auto;
-        }
-        .msg-list {
-            list-style: none;
-            padding: 0; margin: 0;
-        }
-        .msg-item {
-            padding: 10px 15px;
-            border-bottom: 1px solid var(--border);
-            display: grid;
-            grid-template-rows: auto auto;
-            gap: 4px;
-        }
-        .msg-item:hover { background: #0d1a0f; }
-        .msg-meta {
+            padding: 12px 0;
             display: flex;
-            gap: 10px;
-            align-items: baseline;
-            font-size: 10px;
-            color: var(--text-dim);
+            flex-direction: column;
+            gap: 2px;
         }
-        .msg-from  { color: var(--accent); font-weight: bold; }
-        .msg-hops  { color: var(--text-dim); }
-        .msg-snr   { color: #6ee7b7; }
-        .msg-time  { margin-left: auto; color: var(--l-time); opacity: 0.7; }
-        .msg-text  {
-            font-size: 12px;
-            color: var(--text-main);
-            word-break: break-word;
-            white-space: pre-wrap;
+        .msg-bubble {
+            padding: 8px 16px 10px;
+            border-left: 2px solid transparent;
+            transition: background 0.15s;
         }
-        .msg-empty {
-            padding: 30px;
-            text-align: center;
-            opacity: 0.4;
-            font-size: 12px;
-        }
-        .msg-new {
-            animation: msgflash 1.5s ease-out forwards;
+        .msg-bubble:hover { background: #0a150b; }
+        .msg-bubble.msg-new {
+            animation: msgflash 2s ease-out forwards;
+            border-left-color: var(--accent);
         }
         @keyframes msgflash {
-            0%   { background: rgba(34,197,94,0.12); }
+            0%   { background: rgba(34,197,94,0.10); }
             100% { background: transparent; }
         }
+        .msg-bubble-header {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .msg-sender {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--accent);
+            letter-spacing: 0.04em;
+        }
+        .msg-sender-id {
+            font-size: 9px;
+            color: var(--text-dim);
+            opacity: 0.6;
+        }
+        .msg-badges {
+            display: flex;
+            gap: 5px;
+            margin-left: 4px;
+        }
+        .msg-badge {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 2px;
+            background: rgba(34,197,94,0.08);
+            color: var(--text-dim);
+            border: 1px solid var(--border);
+        }
+        .msg-badge.snr  { color: #6ee7b7; }
+        .msg-badge.hops { color: #86efac; }
+        .msg-ts {
+            margin-left: auto;
+            font-size: 9px;
+            color: var(--text-dim);
+            opacity: 0.5;
+            white-space: nowrap;
+        }
+        .msg-body {
+            font-size: 13px;
+            color: #d4ffd4;
+            line-height: 1.5;
+            word-break: break-word;
+            white-space: pre-wrap;
+            padding-left: 2px;
+        }
+        .msg-empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.3;
+            gap: 8px;
+        }
+        .msg-empty-state .empty-icon { font-size: 32px; }
+        .msg-empty-state .empty-text { font-size: 11px; letter-spacing: 0.1em; }
+
+        /* left-panel messages tab — just shows count/redirect hint */
+        .msg-list-wrap { display: none; }
 
         .icon-wrap {
             position: relative; display: flex;
@@ -459,12 +521,10 @@
                 </ul>
             </div>
 
-            <!-- MESSAGES TAB -->
+            <!-- MESSAGES TAB — content lives in right panel -->
             <div class="tab-pane" id="tab-messages">
-                <div class="msg-list-wrap">
-                    <ul class="msg-list" id="msg-list">
-                        <li class="msg-empty">No messages received yet</li>
-                    </ul>
+                <div style="padding:20px 15px; font-size:11px; color:var(--text-dim); opacity:0.6; text-align:center; margin-top:30px;">
+                    Message log →
                 </div>
             </div>
         </div>
@@ -509,6 +569,12 @@
             document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+
+            // Show message panel in right column when Messages tab active,
+            // otherwise show the gateway log
+            const isMessages = btn.dataset.tab === 'messages';
+            document.getElementById('msg-panel').classList.toggle('active', isMessages);
+            document.getElementById('log-panel').style.display = isMessages ? 'none' : '';
         });
     });
 
@@ -701,38 +767,55 @@
     }
 
     function renderMessages(messages, total) {
-        const list = document.getElementById('msg-list');
+        const scroll   = document.getElementById('msg-scroll');
+        const empty    = document.getElementById('msg-empty-state');
+        const countEl  = document.getElementById('msg-count');
+
         if (!messages || messages.length === 0) {
-            list.innerHTML = '<li class="msg-empty">No messages received yet</li>';
+            if (empty) empty.style.display = '';
+            if (countEl) countEl.textContent = '0 messages';
             lastMsgCount = 0;
             return;
         }
 
         const isNew = total > lastMsgCount;
+        const prevCount = lastMsgCount;
         lastMsgCount = total;
 
-        // Render newest-first
-        const reversed = [...messages].reverse();
-        list.innerHTML = reversed.map((m, i) => {
-            const name    = escapeHtml(nodeDisplayName(m.from));
-            const text    = escapeHtml(m.text);
-            const hops    = m.hops > 0 ? `${m.hops} hop${m.hops > 1 ? 's' : ''}` : 'direct';
-            const snr     = m.snr !== 0 ? `${m.snr.toFixed(1)} dB` : '';
-            const ago     = formatAge(Math.floor(Date.now()/1000) - m.ts);
-            const newClass = (isNew && i === 0) ? 'msg-new' : '';
-            return `<li class="msg-item ${newClass}">
-                <div class="msg-meta">
-                    <span class="msg-from">${name}</span>
-                    <span class="msg-id" style="color:var(--text-dim);font-size:9px">${m.from}</span>
-                    <span class="msg-hops">${hops}</span>
-                    ${snr ? `<span class="msg-snr">${snr}</span>` : ''}
-                    <span class="msg-time">${ago} ago</span>
+        if (empty) empty.style.display = 'none';
+        if (countEl) countEl.textContent = `${total} message${total !== 1 ? 's' : ''}`;
+
+        // Oldest-first — natural chat flow (server returns oldest-first already)
+        const wasAtBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 40;
+
+        scroll.innerHTML = messages.map((m, i) => {
+            const name   = escapeHtml(nodeDisplayName(m.from));
+            const nameIsId = name === m.from; // no name resolved yet
+            const text   = escapeHtml(m.text);
+            const hops   = m.hops > 0 ? `${m.hops}hop` : 'direct';
+            const snr    = m.snr !== 0 ? `${m.snr.toFixed(1)}dB` : '';
+            const ago    = formatAge(Math.floor(Date.now()/1000) - m.ts);
+            const isNewMsg = isNew && i >= prevCount;
+            return `<div class="msg-bubble${isNewMsg ? ' msg-new' : ''}">
+                <div class="msg-bubble-header">
+                    <span class="msg-sender">${name}</span>
+                    ${!nameIsId ? `<span class="msg-sender-id">${m.from}</span>` : ''}
+                    <div class="msg-badges">
+                        <span class="msg-badge hops">${hops}</span>
+                        ${snr ? `<span class="msg-badge snr">${snr}</span>` : ''}
+                    </div>
+                    <span class="msg-ts">${ago} ago</span>
                 </div>
-                <div class="msg-text">${text}</div>
-            </li>`;
+                <div class="msg-body">${text}</div>
+            </div>`;
         }).join('');
 
-        // Flash tab badge if not on messages tab
+        // Auto-scroll to bottom if user was already there
+        if (wasAtBottom || isNew) {
+            scroll.scrollTop = scroll.scrollHeight;
+        }
+
+        // Flash tab label when new message arrives on another tab
         const activeTab = document.querySelector('.tab-btn.active');
         if (isNew && activeTab && activeTab.dataset.tab !== 'messages') {
             const msgBtn = document.querySelector('[data-tab="messages"]');
