@@ -58,7 +58,7 @@ deadmesh sits in the middle:
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
 - **Live Node Table**: Persistent mesh node database; names, hops, SNR, battery, position, last heard, updated from every packet type
 
-![Live Meshtastic LONGFAST logging](src/assets/deadmesh_log_text_message.gif)
+![Live Meshtastic LONGFAST logging](src/assets/longfast-live-log.gif)
 
 ## Getting Started
 
