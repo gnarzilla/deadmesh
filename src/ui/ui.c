@@ -12,6 +12,66 @@ static enum MHD_Result handle_api_connections(DeadlightContext *context, struct 
 static enum MHD_Result handle_api_nodes(DeadlightContext *context, struct MHD_Connection *conn, const char *method);
 static enum MHD_Result handle_api_messages(DeadlightContext *context, struct MHD_Connection *conn, const char *method);
 
+/* ─────────────────────────────────────────────────────────────
+ * SSE client registry + broadcast
+ * ───────────────────────────────────────────────────────────── */
+
+void deadlight_sse_client_add(DeadlightContext *context, GOutputStream *stream)
+{
+    g_mutex_lock(&context->sse_clients_mutex);
+    context->sse_clients = g_list_prepend(context->sse_clients,
+                                          g_object_ref(stream));
+    g_mutex_unlock(&context->sse_clients_mutex);
+}
+
+void deadlight_sse_client_remove(DeadlightContext *context, GOutputStream *stream)
+{
+    g_mutex_lock(&context->sse_clients_mutex);
+    GList *node = g_list_find(context->sse_clients, stream);
+    if (node) {
+        g_object_unref(stream);
+        context->sse_clients = g_list_delete_link(context->sse_clients, node);
+    }
+    g_mutex_unlock(&context->sse_clients_mutex);
+}
+
+void deadlight_sse_broadcast(DeadlightContext *context,
+                              const gchar *event_type,
+                              const gchar *json_data)
+{
+    /* Format: "event: <type>\ndata: <json>\n\n" */
+    gchar *frame = g_strdup_printf("event: %s\ndata: %s\n\n",
+                                   event_type, json_data);
+    gsize  frame_len = strlen(frame);
+
+    g_mutex_lock(&context->sse_clients_mutex);
+
+    GList *dead = NULL;
+    for (GList *l = context->sse_clients; l; l = l->next) {
+        GOutputStream *stream = l->data;
+        GError *err = NULL;
+        gsize written = 0;
+        gboolean ok = g_output_stream_write_all(stream,
+                                                frame, frame_len,
+                                                &written, NULL, &err);
+        if (!ok || err) {
+            g_clear_error(&err);
+            dead = g_list_prepend(dead, stream);
+        }
+    }
+
+    /* Remove dead clients while still holding the lock */
+    for (GList *l = dead; l; l = l->next) {
+        GOutputStream *stream = l->data;
+        context->sse_clients = g_list_remove(context->sse_clients, stream);
+        g_object_unref(stream);
+    }
+    g_list_free(dead);
+
+    g_mutex_unlock(&context->sse_clients_mutex);
+    g_free(frame);
+}
+
 /* ---------- Simple JSON helpers ---------- */
 static int json_response(struct MHD_Connection *conn, const char *json)
 {

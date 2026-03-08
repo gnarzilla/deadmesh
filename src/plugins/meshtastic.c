@@ -136,6 +136,38 @@ static void node_update_from_packet(DeadlightContext *context,
 }
 
 
+/* Broadcast a single node's current state via SSE.
+ * Caller must NOT hold node_table_mutex.              */
+static void node_sse_push(DeadlightContext *context, uint32_t node_id)
+{
+    if (!context->node_table) return;
+
+    g_mutex_lock(&context->node_table_mutex);
+    MeshNode *node = g_hash_table_lookup(context->node_table,
+                                          GUINT_TO_POINTER(node_id));
+    if (!node) { g_mutex_unlock(&context->node_table_mutex); return; }
+
+    gchar *short_esc = g_strescape(node->short_name, NULL);
+    gchar *long_esc  = g_strescape(node->long_name,  NULL);
+    gchar *json = g_strdup_printf(
+        "{\"id\":\"%08x\",\"short\":\"%s\",\"long\":\"%s\","
+        "\"hops\":%d,\"snr\":%.1f,\"last_heard\":%" G_GINT64_FORMAT ","
+        "\"battery\":%u,\"has_position\":%s,"
+        "\"lat\":%.6f,\"lon\":%.6f,\"alt\":%d,\"is_local\":%s}",
+        node->node_id, short_esc, long_esc,
+        node->hops_away, (double)node->snr, node->last_heard,
+        (unsigned)node->battery_level,
+        node->has_position ? "true" : "false",
+        node->latitude, node->longitude, node->altitude,
+        node->is_local ? "true" : "false");
+    g_free(short_esc);
+    g_free(long_esc);
+    g_mutex_unlock(&context->node_table_mutex);
+
+    deadlight_sse_broadcast(context, "node_update", json);
+    g_free(json);
+}
+
 /* ─────────────────────────────────────────────────────────────
  * nanopb callback helpers for Data.payload (bytes field)
  * ───────────────────────────────────────────────────────────── */
@@ -559,6 +591,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                                     } else if (wt2 == 0) {
                                         uint64_t dummy; bool dok;
                                         READ_VARINT(pp, pend, dummy, dok);
+                                        (void)dummy;
                                         if (!dok) break;
                                     } else if (wt2 == 5) { pp += 4; }
                                     else if (wt2 == 1) { pp += 8; }
@@ -572,6 +605,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                         } else if (wire_type == 0) {
                             uint64_t dummy; bool dok;
                             READ_VARINT(p, end, dummy, dok);
+                            (void)dummy;
                             if (!dok) break;
                         } else if (wire_type == 5) { p += 4; }
                         else if (wire_type == 1) { p += 8; }
@@ -615,6 +649,22 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                             context->message_ring_count++;
 
                         g_mutex_unlock(&context->message_ring_mutex);
+
+                        /* SSE push — notify dashboard clients immediately */
+                        {
+                            gchar *text_esc = g_strescape(text, NULL);
+                            gchar *json = g_strdup_printf(
+                                "{\"from\":\"%08x\",\"text\":\"%s\","
+                                "\"ts\":%" G_GINT64_FORMAT ",\"hops\":%u,\"snr\":%.1f}",
+                                pkt->from, text_esc,
+                                (gint64)(g_get_real_time() / G_USEC_PER_SEC),
+                                (pkt->hop_start > pkt->hop_limit)
+                                    ? (unsigned)(pkt->hop_start - pkt->hop_limit) : 0u,
+                                (double)pkt->rx_snr);
+                            deadlight_sse_broadcast(context, "message", json);
+                            g_free(json);
+                            g_free(text_esc);
+                        }
                     }
 
                     g_free(text);
@@ -641,6 +691,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                         g_debug("Meshtastic: POSITION from %08x (%.5f, %.5f)",
                                 pkt->from, pos.latitude_i * 1e-7,
                                 pos.longitude_i * 1e-7);
+                        node_sse_push(context, pkt->from);
                     }
                 }
 
@@ -666,6 +717,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                         g_debug("Meshtastic: TELEMETRY from %08x (battery=%u%%)",
                                 pkt->from,
                                 tel.variant.device_metrics.battery_level);
+                        node_sse_push(context, pkt->from);
                     }
                 }
 
@@ -762,6 +814,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                     node->last_heard = (gint64)ni->last_heard;
             }
             g_mutex_unlock(&context->node_table_mutex);
+            node_sse_push(context, ni->num);
             break;
         }
 

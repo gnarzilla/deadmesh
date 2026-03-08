@@ -38,6 +38,7 @@ DeadlightContext *deadlight_context_new(void) {
     ctx->uptime_timer = g_timer_new();
     
     g_mutex_init(&ctx->stats_mutex);
+    g_mutex_init(&ctx->sse_clients_mutex);
 
     // Set defaults
     ctx->shutdown_requested = FALSE;
@@ -101,6 +102,7 @@ void deadlight_context_free(DeadlightContext *ctx) {
 
     g_free(ctx->pool_eviction_policy);
 
+    g_mutex_clear(&ctx->sse_clients_mutex);
     g_mutex_clear(&ctx->stats_mutex);
     
     // Free cached strings

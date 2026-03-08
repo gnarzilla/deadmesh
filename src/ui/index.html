@@ -6,7 +6,7 @@
     <title>DEADLIGHT // MESH</title>
     
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="shortcut icon" type="image/x-icon" href="favicon.png">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
     
     <style>
         :root {
@@ -538,7 +538,7 @@
             </div>
             <div style="flex:1; overflow-y:auto; padding:8px 0;" id="msg-scroll">
                 <div id="msg-empty-state" style="padding:40px; text-align:center; opacity:0.3; font-size:11px; letter-spacing:0.1em;">
-                     &nbsp; LISTENING FOR MESH TRAFFIC...
+                    📻 &nbsp; LISTENING FOR MESH TRAFFIC...
                 </div>
             </div>
         </div>
@@ -655,7 +655,7 @@
     // ═══════════════════════════════════════════════════════════════════════
     let sortCol = 'last_heard';
     let sortDir = -1; // -1 = desc, 1 = asc
-    let cachedNodes = [];
+    // cachedNodes replaced by nodeMap (id->node) for SSE merge support
 
     // Wire header clicks
     document.querySelectorAll('table.node-table th[data-sort]').forEach(th => {
@@ -668,7 +668,7 @@
                 sortDir = -1;
             }
             updateSortIndicators();
-            renderNodes(cachedNodes);
+            renderNodes(Object.values(nodeMap));
         });
     });
 
@@ -704,15 +704,14 @@
     }
 
     function renderNodes(nodes) {
-        if (nodes) cachedNodes = nodes;
         const tbody = document.getElementById('node-tbody');
-        if (!cachedNodes || cachedNodes.length === 0) {
+        if (!nodes || nodes.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="node-empty">No nodes heard yet</td></tr>';
             return;
         }
 
         /* Sort: local node always first, then by chosen column */
-        const sorted = [...cachedNodes].sort((a, b) => {
+        const sorted = [...nodes].sort((a, b) => {
             if (a.is_local !== b.is_local) return a.is_local ? -1 : 1;
             let av = a[sortCol], bv = b[sortCol];
             if (sortCol === 'long' || sortCol === 'short') {
@@ -752,22 +751,27 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // NODE POLLING  — independent of SSE, hits /api/nodes every 5s
+    // NODE DATA — initial load + SSE push, slow fallback poll
     // ═══════════════════════════════════════════════════════════════════════
+
+    // nodeMap: id -> node object, so SSE updates can merge cleanly
+    const nodeMap = {};
+
     async function pollNodes() {
         try {
             const res  = await fetch(UI_BASE + '/api/nodes');
             if (!res.ok) return;
             const data = await res.json();
-            renderNodes(data.nodes || []);
+            // Merge into nodeMap
+            (data.nodes || []).forEach(n => { nodeMap[n.id] = n; });
+            renderNodes(Object.values(nodeMap));
             document.getElementById('val-nodes').textContent = data.total ?? '—';
-        } catch (e) {
-            /* silently skip — SSE badge already indicates connectivity */
-        }
+        } catch (e) { /* silent */ }
     }
 
+    // Initial load, then slow fallback poll (30s) for any missed SSE events
     pollNodes();
-    setInterval(pollNodes, NODE_POLL_MS);
+    setInterval(pollNodes, 30000);
 
     // ═══════════════════════════════════════════════════════════════════════
     // MESSAGES
@@ -776,8 +780,7 @@
 
     function nodeDisplayName(nodeId) {
         // Look up name from cached node table if available
-        if (!cachedNodes.length) return nodeId;
-        const node = cachedNodes.find(n => n.id === nodeId);
+        const node = nodeMap[nodeId];
         if (!node) return nodeId;
         return node.long || node.short || nodeId;
     }
@@ -842,28 +845,33 @@
         }
     }
 
+    // messageList: ordered array of message objects
+    const messageList = [];
+
     async function pollMessages() {
         try {
             const res = await fetch(UI_BASE + '/api/messages');
             if (!res.ok) return;
             const data = await res.json();
-            renderMessages(data.messages || [], data.total || 0);
+            // Full replace on fallback poll
+            messageList.length = 0;
+            (data.messages || []).forEach(m => messageList.push(m));
+            renderMessages(messageList, messageList.length);
         } catch (e) { /* silent */ }
     }
 
+    // Initial load, then slow fallback poll (30s)
     pollMessages();
-    setInterval(pollMessages, 5000);
+    setInterval(pollMessages, 30000);
 
     // Age column ticks every second client-side — no server round-trip needed.
-    // Recomputes age_s from last_heard timestamp and re-renders the table.
     setInterval(() => {
-        if (!cachedNodes.length) return;
+        if (!Object.keys(nodeMap).length) return;
         const now = Math.floor(Date.now() / 1000);
-        cachedNodes = cachedNodes.map(n => ({
-            ...n,
-            age_s: n.last_heard > 0 ? now - n.last_heard : -1
-        }));
-        renderNodes(null); // null = use cachedNodes as-is
+        Object.values(nodeMap).forEach(n => {
+            n.age_s = n.last_heard > 0 ? now - n.last_heard : -1;
+        });
+        renderNodes(Object.values(nodeMap));
     }, 1000);
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -961,6 +969,34 @@
             }
         });
 
+        // ── Mesh node update — merge single node into nodeMap ──────────
+        eventSource.addEventListener('node_update', (event) => {
+            try {
+                const node = JSON.parse(event.data);
+                const now  = Math.floor(Date.now() / 1000);
+                node.age_s = node.last_heard > 0 ? now - node.last_heard : -1;
+                nodeMap[node.id] = { ...(nodeMap[node.id] || {}), ...node };
+                renderNodes(Object.values(nodeMap));
+                document.getElementById('val-nodes').textContent =
+                    Object.keys(nodeMap).length;
+            } catch (err) {
+                console.error('[SSE] node_update parse error:', err);
+            }
+        });
+
+        // ── New mesh text message ──────────────────────────────────────
+        eventSource.addEventListener('message', (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                messageList.push(msg);
+                // Keep at most 50 (matches server ring buffer size)
+                if (messageList.length > 50) messageList.shift();
+                renderMessages(messageList, messageList.length);
+            } catch (err) {
+                console.error('[SSE] message parse error:', err);
+            }
+        });
+
         eventSource.onopen = () => {
             updateApiStatus('online');
             reconnectAttempts = 0;
@@ -979,7 +1015,7 @@
     // POLLING FALLBACK
     // ═══════════════════════════════════════════════════════════════════════
     function switchToPollingMode() {
-        document.getElementById('mode-indicator').textContent = 'POLLING';
+        document.getElementById('mode-indicator').textContent = '🔄 POLLING';
         if (eventSource) { eventSource.close(); eventSource = null; }
 
         async function poll() {

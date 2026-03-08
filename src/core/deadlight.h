@@ -227,19 +227,33 @@ typedef struct {
     gboolean  is_local;               /* TRUE for our own node            */
 } MeshNode;
 
-/* ═══════════════════════════════════════════════════════════
- * MeshMessage — ring buffer entry for received text messages
- * ═══════════════════════════════════════════════════════════ */
-
-#define MESH_MESSAGE_RING_SIZE  50   /* keep last N messages in memory */
+#define MESH_MESSAGE_RING_SIZE 50
 
 typedef struct {
-    uint32_t  from_node;          /* sender node ID                        */
-    char      text[233];          /* max Meshtastic text payload + NUL     */
-    gint64    timestamp;          /* unix seconds (g_get_real_time / 1e6)  */
-    uint8_t   hops;               /* hop_start - hop_limit from pkt header */
-    float     snr;                /* rx_snr from packet header             */
+    uint32_t  from_node;
+    char      text[233];
+    gint64    timestamp;
+    uint8_t   hops;
+    float     snr;
 } MeshMessage;
+
+/*
+ * ADD TO DeadlightContext struct:
+ *
+ *   GHashTable  *node_table;        // uint32 node_id -> MeshNode*
+ *   GMutex       node_table_mutex;
+ *
+ * ADD TO context init (wherever other mutexes are initialised):
+ *
+ *   context->node_table = g_hash_table_new_full(
+ *       g_direct_hash, g_direct_equal, NULL, g_free);
+ *   g_mutex_init(&context->node_table_mutex);
+ *
+ * ADD TO context cleanup:
+ *
+ *   g_mutex_clear(&context->node_table_mutex);
+ *   g_hash_table_destroy(context->node_table);
+ */
 
 struct _DeadlightContext {
     GMainLoop              *main_loop;
@@ -249,14 +263,8 @@ struct _DeadlightContext {
     DeadlightPluginManager *plugins;
     DeadlightVPNManager    *vpn;
     DeadlightMeshManager   *mesh;          /* NULL when mesh transport unused */
-    GHashTable             *node_table;
-    GMutex                  node_table_mutex;
-
-    /* Mesh message ring buffer — last MESH_MESSAGE_RING_SIZE text messages */
-    MeshMessage             message_ring[MESH_MESSAGE_RING_SIZE];
-    gint                    message_ring_head;   /* next write index (0-based, wraps) */
-    gint                    message_ring_count;  /* how many entries are valid        */
-    GMutex                  message_ring_mutex;
+    GHashTable             *node_table;     
+    GMutex                 node_table_mutex;
     GHashTable             *plugins_data;
     GHashTable             *connections;
     GHashTable             *certificates;
@@ -303,6 +311,18 @@ struct _DeadlightContext {
     GMutex   stats_mutex;
 
     gchar  **local_hostnames;    // NULL-terminated array of local hostnames
+
+    /* Mesh message ring buffer */
+    MeshMessage  message_ring[MESH_MESSAGE_RING_SIZE];
+    gint         message_ring_head;
+    gint         message_ring_count;
+    GMutex       message_ring_mutex;
+
+    /* SSE push clients — list of open GOutputStream* watching /api/stream.
+     * The UI server registers clients here; meshtastic calls
+     * deadlight_sse_broadcast() to push node/message events.           */
+    GList   *sse_clients;
+    GMutex   sse_clients_mutex;
 };
 
 struct _DeadlightConnection {
@@ -543,6 +563,17 @@ void            connection_pool_get_stats(ConnectionPool *pool, guint *idle_coun
 gboolean     deadlight_test_module(const gchar *module_name);
 const gchar *deadlight_protocol_to_string(DeadlightProtocol protocol);
 gchar       *deadlight_format_bytes(guint64 bytes);
+
+/* SSE push — broadcasts an SSE event to all connected /api/stream clients.
+ * event_type is e.g. "node_update" or "message"; json_data is the payload.
+ * Safe to call from any thread.                                            */
+void         deadlight_sse_broadcast(DeadlightContext *context,
+                                     const gchar *event_type,
+                                     const gchar *json_data);
+
+/* Register/unregister an SSE client output stream */
+void         deadlight_sse_client_add(DeadlightContext *context, GOutputStream *stream);
+void         deadlight_sse_client_remove(DeadlightContext *context, GOutputStream *stream);
 
 #ifdef __cplusplus
 }
