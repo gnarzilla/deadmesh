@@ -8,6 +8,8 @@ Part of the [Deadlight ecosystem](https://deadlight.boo) secure, performant, pri
 
 ![Live Meshtastic LONGFAST logging](src/assets/deadmesh_log_text_message.gif)
 
+![Live Meshtastic Gateway](src/assets/deadmesh-live.gif)
+
 ## Overview
 
 **deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols HTTP/HTTPS, email, DNS, FTP, as if they had normal connectivity.
