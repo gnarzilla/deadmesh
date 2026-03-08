@@ -444,13 +444,12 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                                    const MeshFrame *frame) {
     meshtastic_FromRadio from_radio = meshtastic_FromRadio_init_default;
 
+    /* NOTE: do NOT pre-wire decoded.payload here — nanopb zeros the
+     * MeshPacket union when it writes packet_tag, destroying any callback
+     * pointer we set before the decode. Instead we re-decode the packet
+     * payload in a second pass once we know which portnum we have.
+     * decoded_payload is populated by that second pass below.           */
     PbDecodeCtx decoded_payload = {0};
-    from_radio.payload_variant.packet
-              .payload_variant.decoded
-              .payload.funcs.decode = payload_decode_cb;
-    from_radio.payload_variant.packet
-              .payload_variant.decoded
-              .payload.arg = &decoded_payload;
 
     PbStringCtx log_message = {0};
     from_radio.payload_variant.log_record
@@ -496,16 +495,105 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
 
                 int portnum = pkt->payload_variant.decoded.portnum;
 
+                /* Decode Data.payload by walking the wire directly.
+                 *
+                 * We cannot pre-wire payload_decode_cb before pb_decode()
+                 * on a FromRadio or MeshPacket struct because nanopb zeroes
+                 * each oneof union before writing the selected variant,
+                 * destroying any callback pointer we set beforehand.
+                 *
+                 * Strategy: manually scan the raw protobuf bytes to locate
+                 * the MeshPacket (FromRadio field 2) and then the Data
+                 * submessage (MeshPacket field 4), then decode meshtastic_Data
+                 * directly — it has no oneof, so the callback survives.
+                 *
+                 * Protobuf wire format: each field is (tag<<3)|wire_type
+                 *   wire_type 0 = varint, 2 = length-delimited (LEN)
+                 * We skip fields we don't care about by reading their length
+                 * and jumping past them.                                    */
+                {
+                    const uint8_t *p   = frame->payload;
+                    const uint8_t *end = frame->payload + frame->len;
+
+                    /* Helper lambda (as inline block) to decode a varint */
+                    #define READ_VARINT(ptr, endp, out, ok) do {                                   uint64_t _val = 0; int _shift = 0; (ok) = false;                          while ((ptr) < (endp)) {                                                       uint8_t _b = *(ptr)++;                                                     _val |= (uint64_t)(_b & 0x7F) << _shift;                                  _shift += 7;                                                               if (!(_b & 0x80)) { (out) = _val; (ok) = true; break; }                         }                                                                      } while(0)
+
+                    /* Scan FromRadio for field 2 (packet, LEN) */
+                    while (p < end) {
+                        uint64_t tag_val; bool tok;
+                        READ_VARINT(p, end, tag_val, tok);
+                        if (!tok) break;
+                        uint32_t field_num = (uint32_t)(tag_val >> 3);
+                        uint32_t wire_type = (uint32_t)(tag_val & 0x7);
+
+                        if (wire_type == 2) { /* LEN */
+                            uint64_t flen; bool lok;
+                            READ_VARINT(p, end, flen, lok);
+                            if (!lok || p + flen > end) break;
+
+                            if (field_num == meshtastic_FromRadio_packet_tag) {
+                                /* Found MeshPacket — scan it for field 4 (decoded, LEN) */
+                                const uint8_t *pp  = p;
+                                const uint8_t *pend = p + flen;
+                                while (pp < pend) {
+                                    uint64_t t2; bool t2ok;
+                                    READ_VARINT(pp, pend, t2, t2ok);
+                                    if (!t2ok) break;
+                                    uint32_t fn2 = (uint32_t)(t2 >> 3);
+                                    uint32_t wt2 = (uint32_t)(t2 & 0x7);
+                                    if (wt2 == 2) {
+                                        uint64_t fl2; bool l2ok;
+                                        READ_VARINT(pp, pend, fl2, l2ok);
+                                        if (!l2ok || pp + fl2 > pend) break;
+                                        if (fn2 == meshtastic_MeshPacket_decoded_tag) {
+                                            /* Found Data — decode it directly, no oneof */
+                                            meshtastic_Data data_msg = meshtastic_Data_init_default;
+                                            data_msg.payload.funcs.decode = payload_decode_cb;
+                                            data_msg.payload.arg          = &decoded_payload;
+                                            pb_istream_t ds = pb_istream_from_buffer(pp, (size_t)fl2);
+                                            pb_decode(&ds, meshtastic_Data_fields, &data_msg);
+                                            pp = pend; /* done */
+                                        } else {
+                                            pp += (size_t)fl2;
+                                        }
+                                    } else if (wt2 == 0) {
+                                        uint64_t dummy; bool dok;
+                                        READ_VARINT(pp, pend, dummy, dok);
+                                        if (!dok) break;
+                                    } else if (wt2 == 5) { pp += 4; }
+                                    else if (wt2 == 1) { pp += 8; }
+                                    else break; /* unknown wire type */
+                                }
+                                p += flen;
+                                break; /* done with FromRadio scan */
+                            } else {
+                                p += flen;
+                            }
+                        } else if (wire_type == 0) {
+                            uint64_t dummy; bool dok;
+                            READ_VARINT(p, end, dummy, dok);
+                            if (!dok) break;
+                        } else if (wire_type == 5) { p += 4; }
+                        else if (wire_type == 1) { p += 8; }
+                        else break;
+                    }
+                    #undef READ_VARINT
+                    /* decoded_payload.len now reflects actual payload bytes */
+                }
+
                 g_info("Meshtastic: packet from %08x port=%d len=%zu %s",
                        pkt->from, portnum, decoded_payload.len,
                        (portnum == (int)mp->custom_port)
                            ? "[DEADMESH]" : "[passthrough]");
 
-                /* Text messages — log and store in ring buffer */
+                /* Text messages */
                 if (portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
-                    gchar *text = g_strndup((const gchar *)decoded_payload.buf,
-                                            decoded_payload.len);
-                    g_info("Meshtastic: TEXT from %08x: %s", pkt->from, text);
+                    /* decoded_payload is populated by the second-pass above */
+                    gchar *text = (decoded_payload.len > 0)
+                        ? g_strndup((const gchar *)decoded_payload.buf, decoded_payload.len)
+                        : g_strdup("");
+                    g_info("Meshtastic: TEXT from %08x: [%s] (len=%zu)",
+                           pkt->from, text, decoded_payload.len);
 
                     /* Append to context ring buffer */
                     if (context->message_ring_head >= 0) {

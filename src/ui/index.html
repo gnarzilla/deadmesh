@@ -6,7 +6,7 @@
     <title>DEADLIGHT // MESH</title>
     
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.png">
     
     <style>
         :root {
@@ -529,8 +529,22 @@
             </div>
         </div>
 
+        <!-- RIGHT: MESSAGE CHAT LOG (shown when Messages tab active) -->
+        <div class="terminal-panel" id="msg-panel" style="display:none; flex-direction:column;">
+            <div class="panel-head">
+                <span>MESH MESSAGES</span>
+                <span style="font-size:10px; color:var(--accent); margin-left:8px;">LongFast / Primary</span>
+                <span style="font-size:10px; color:var(--text-dim); margin-left:auto;" id="msg-count">0 messages</span>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding:8px 0;" id="msg-scroll">
+                <div id="msg-empty-state" style="padding:40px; text-align:center; opacity:0.3; font-size:11px; letter-spacing:0.1em;">
+                     &nbsp; LISTENING FOR MESH TRAFFIC...
+                </div>
+            </div>
+        </div>
+
         <!-- RIGHT: LOG -->
-        <div class="terminal-panel">
+        <div class="terminal-panel" id="log-panel">
             <div class="panel-head">
                 <span>GATEWAY LOG</span>
                 <div style="display:flex; gap:10px; align-items:center;">
@@ -573,8 +587,10 @@
             // Show message panel in right column when Messages tab active,
             // otherwise show the gateway log
             const isMessages = btn.dataset.tab === 'messages';
-            document.getElementById('msg-panel').classList.toggle('active', isMessages);
-            document.getElementById('log-panel').style.display = isMessages ? 'none' : '';
+            const msgPanel = document.getElementById('msg-panel');
+            const logPanel = document.getElementById('log-panel');
+            if (msgPanel) msgPanel.style.display = isMessages ? 'flex' : 'none';
+            if (logPanel) logPanel.style.display = isMessages ? 'none' : '';
         });
     });
 
@@ -963,7 +979,7 @@
     // POLLING FALLBACK
     // ═══════════════════════════════════════════════════════════════════════
     function switchToPollingMode() {
-        document.getElementById('mode-indicator').textContent = '🔄 POLLING';
+        document.getElementById('mode-indicator').textContent = 'POLLING';
         if (eventSource) { eventSource.close(); eventSource = null; }
 
         async function poll() {
