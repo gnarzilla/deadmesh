@@ -14,8 +14,8 @@ worker_threads      = 8
 
 [ssl]
 enabled             = true
-ca_cert_file        = /home/thatch/.deadlight/ca.crt
-ca_key_file         = /home/thatch/.deadlight/ca.key
+ca_cert_file        = /home/thatch/.deadlight/ca/ca.crt
+ca_key_file         = /home/thatch/.deadlight/ca/ca.key
 cert_cache_dir      = /tmp/deadmesh_certs
 cert_cache_size     = 1000
 cert_validity_days  = 30

@@ -82,14 +82,47 @@ deadmesh sits in the middle:
 
 ### Quick Install
 
-1. **Clone and build**:
+1. **Install system dependencies**:
    ```bash
-   git clone https://github.com/gnarzilla/meshtastic.deadlight.git
-   cd meshtastic.deadlight
-   make clean && make UI=1
+   # Debian/Ubuntu/Raspberry Pi OS
+   sudo apt-get install build-essential pkg-config libglib2.0-dev \
+     libssl-dev libjson-glib-dev libmicrohttpd-dev protobuf-compiler xxd
    ```
 
-2. **Connect your Meshtastic radio**:
+   Verify they're all found:
+   ```bash
+   pkg-config --modversion glib-2.0 openssl json-glib-1.0
+   # Should print three version numbers — if any fail, the build will fail
+   ```
+
+2. **Set up Python environment for protobuf generation**:
+
+   The nanopb generator that compiles Meshtastic protobufs requires specific Python packages. Use a venv to avoid conflicts with system Python:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install protobuf grpcio-tools
+   ```
+   > **Keep this venv active for the build step.** You can deactivate it after `make` completes.
+
+3. **Clone and build**:
+   ```bash
+   git clone https://github.com/gnarzilla/deadmesh.git
+   cd deadmesh
+   make clean && make UI=1
+   deactivate  # exit venv after build
+   ```
+
+   A successful build produces:
+   ```
+   bin/deadmesh
+   bin/plugins/adblocker.so
+   bin/plugins/meshtastic.so
+   bin/plugins/ratelimiter.so
+   tools/mesh-sim
+   ```
+
+4. **Connect your Meshtastic radio**:
    ```bash
    # Most devices appear as /dev/ttyACM0 or /dev/ttyUSB0
    ls -l /dev/ttyACM0 /dev/ttyUSB0 2>/dev/null
@@ -99,7 +132,31 @@ deadmesh sits in the middle:
    # Log out and back in for group change to take effect
    ```
 
-3. **Configure** — create `deadmesh.conf`:
+5. **Generate CA certificate** (for HTTPS interception):
+
+   Create the cert directory first, then generate a local CA:
+   ```bash
+   mkdir -p ~/.deadlight
+
+   openssl genrsa -out ~/.deadlight/ca.key 4096
+   openssl req -new -x509 -days 3650 \
+     -key ~/.deadlight/ca.key \
+     -out ~/.deadlight/ca.crt \
+     -subj "/CN=deadmesh CA/O=deadlight/C=US"
+
+   chmod 600 ~/.deadlight/ca.key
+   chmod 644 ~/.deadlight/ca.crt
+   ```
+
+   Install it system-wide so curl and other tools trust it:
+   ```bash
+   sudo cp ~/.deadlight/ca.crt /usr/local/share/ca-certificates/deadmesh.crt
+   sudo update-ca-certificates
+   ```
+
+   > **Copying from another machine?** If you already have a CA from a previous install (e.g. WSL), copy both `ca.crt` and `ca.key` to `~/.deadlight/` on the new machine instead of generating new ones.
+
+6. **Configure** — create `deadmesh.conf`:
    ```ini
    [core]
    port = 8080
@@ -127,38 +184,36 @@ deadmesh sits in the middle:
    upstream_timeout = 120
    ```
 
-   > **Note**: Use absolute paths for `ca_cert_file` and `ca_key_file`. The `~` shortcut expands to `/root/` when running with `sudo`, which is likely not where your certs are.
+   > **Important**: Use absolute paths for `ca_cert_file` and `ca_key_file` — replace `youruser` with your actual username. The `~` shortcut expands to `/root/` when running with `sudo`, which is not where your certs are.
 
-4. **Install CA certificate** (for HTTPS interception):
-   ```bash
-   sudo cp /home/youruser/.deadlight/ca.crt /usr/local/share/ca-certificates/deadmesh.crt
-   sudo update-ca-certificates
-   ```
-
-5. **Run the gateway**:
+7. **Run the gateway**:
    ```bash
    ./bin/deadmesh -c deadmesh.conf -v
    ```
 
    You should see:
+   - `Configuration loaded` and `Config applied` — config is valid
    - `Meshtastic: sent want_config handshake` — serial API initialized
    - `Meshtastic: auto-detected local node ID: XXXXXXXX` — device recognized
    - `Meshtastic: NodeInfo update for XXXXXXXX` — mesh nodes populating
    - Live packet stream: `POSITION`, `TELEMETRY`, `TEXT`, `NODEINFO` from mesh
 
-6. **Open the dashboard** at `http://localhost:8081` to monitor gateway activity.
+   If you see `Configuration validation failed: Cannot read CA cert file` — the path in your config doesn't match where you put the certs. Double-check the absolute path and that `~/.deadlight/ca.crt` exists.
 
-7. **Test the proxy**:
+8. **Open the dashboard** at `http://localhost:8081` to monitor gateway activity.
+
+9. **Test the proxy**:
    ```bash
    # HTTP
    curl -x http://localhost:8080 http://example.com
 
    # HTTPS
-   curl --cacert /home/youruser/.deadlight/ca.crt -x http://localhost:8080 https://example.com
+   curl --cacert ~/.deadlight/ca.crt -x http://localhost:8080 https://example.com
 
    # SOCKS5
    curl --socks5 localhost:8080 http://example.com
    ```
+
 
 ### WSL (Windows Subsystem for Linux)
 
