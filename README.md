@@ -6,7 +6,7 @@ Part of the [Deadlight ecosystem](https://deadlight.boo) secure, performant, pri
 
 [![deadmesh](https://meshtastic.deadlight.boo/favicon.ico)](https://meshtastic.deadlight.boo) [Project Blog](https://meshtastic.deadlight.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
-![Live Meshtastic LONGFAST logging](src/assets/deadmesh_log_text_message.gif)
+![Live Meshtastic Gateway](src/assets/deadmesh-live.gif)
 
 ## Overview
 
@@ -58,7 +58,7 @@ deadmesh sits in the middle:
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
 - **Live Node Table**: Persistent mesh node database; names, hops, SNR, battery, position, last heard, updated from every packet type
 
-![vid19](src/assets/vid19.gif)
+![Live Meshtastic LONGFAST logging](src/assets/deadmesh_log_text_message.gif)
 
 ## Getting Started
 
