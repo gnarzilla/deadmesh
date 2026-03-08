@@ -178,8 +178,6 @@ sudo usermod -a -G dialout $USER
 
 > **Note**: You must re-run `usbipd attach` from PowerShell each time the radio is unplugged, the PC sleeps, or WSL restarts.
 
-![mesh dashboard](src/assets/live-mesh-dash.gif)
-
 ## Hardware
 
 ### Tested Hardware
