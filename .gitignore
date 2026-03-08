@@ -20,3 +20,9 @@ src/plugins/meshtastic/build/
 # OS junk
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
+
+*.o
+*.out
+*.a
+build/
