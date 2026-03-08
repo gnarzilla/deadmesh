@@ -3,9 +3,6 @@ venv/
 __pycache__/
 *.pyc
 
-# Generated protobuf files
-src/plugins/protobufs/*
-
 # Meshtastic plugin build artifacts
 src/plugins/meshtastic/build/
 
