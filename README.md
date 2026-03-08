@@ -6,7 +6,7 @@ Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosyst
 
 <img src="https://meshtastic.deadlight.boo/apple-touch-icon.png" width="32" height="32"> · [Project Blog](https://meshtastic.deadlight.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
-![Live Meshtastic Gateway](src/assets/deadmesh-live.gif)
+![mesh is more boring](src/assets/mesh-is-more-boring.gif)
 
 ## Overview
 
@@ -34,6 +34,8 @@ deadmesh sits in the middle:
 3. **Bridges transparently**: Fragments outgoing requests, reassembles incoming responses
 
 **Result**: Your mesh network works with everything: email clients, web browsers, update tools, API services, without modifying a single line of application code.
+
+![Live Meshtastic Gateway](src/assets/deadmesh-live.gif)
 
 ### Critical Scenarios This Enables
 
