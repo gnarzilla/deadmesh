@@ -4,7 +4,8 @@
 
 Part of the [Deadlight ecosystem](https://deadlight.boo) secure, performant, privacy-focused tools for resilient connectivity on mesh/satellite/spotty networks.
 
-[![deadmesh](https://meshtastic.deadlight.boo/favicon.png height=32 width=32)](https://meshtastic.deadlight.boo) [Project Blog](https://meshtastic.deadlight.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
+<img src="https://meshtastic.deadlight.boo/apple-touch-icon.png" width="32" height="32">[meshtastic.deadlight](https://meshtastic.deadlight.boo)
+ [Project Blog](https://meshtastic.deadlight.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
 ![Live Meshtastic Gateway](src/assets/deadmesh-live.gif)
 
