@@ -682,6 +682,10 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 - [ ] Adaptive fragmentation based on live mesh conditions
 - [ ] Exponential backoff retry
 - [ ] Android client app (native deadmesh on-device)
+- [ ] `mesh://` scheme handler — gateway-side URL prefix for forced LoRa optimization
+- [ ] Smart mesh router — whitelist/blacklist/API substitution table
+- [ ] Content transformation pipeline — readability strip, image drop, size cap
+- [ ] Wikipedia plaintext fast path via MediaWiki API
 
 ### v1.3
 - [ ] Multi-gateway coordination protocol
@@ -689,6 +693,9 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 - [ ] Per-client/protocol bandwidth shaping
 - [ ] WebRTC signaling over mesh (peer-to-peer voice/video)
 - [ ] Per-node RSSI, airtime, channel utilization in dashboard
+- [ ] Per-domain transformation profiles
+- [ ] Automatic tier classification (ML-assisted or heuristic)
+- [ ] Client-side `mesh://` scheme handler for Android
 
 ### v2.0 (Future)
 - [ ] Full IPv6 support
