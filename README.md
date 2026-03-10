@@ -1,4 +1,4 @@
-# deadmesh
+<img width="1791" height="821" alt="image" src="https://github.com/user-attachments/assets/5e102b6b-1661-4cfe-a0d5-b3de67211ef6" /><img width="1791" height="821" alt="image" src="https://github.com/user-attachments/assets/5e102b6b-1661-4cfe-a0d5-b3de67211ef6" /># deadmesh
 
 **Internet-over-LoRa: Update your blog from a can on a string from the smoldering rubble.**
 
@@ -283,14 +283,13 @@ meshtastic --set lora.region US --set lora.modem_preset LONG_FAST
 meshtastic --set lora.tx_power 30  # Check local regulations
 meshtastic --set lora.hop_limit 3  # Adjust for network size
 ```
-
-![mesh is more boring](src/assets/mesh_is_more_boring.gif)
-
 ## Dashboard
 
 deadmesh ships with a real-time gateway dashboard embedded directly in the binary. No external files, no dependencies, nothing to serve separately.
 
 **Access**: `http://localhost:8081` (configurable via `plugin.stats.web_port`)
+
+![Deadmesh Gateway Log](src/assets/static_gatewaylog.png)
 
 **Features**:
 - Live stats: active links, packets relayed, bytes bridged, mesh node count, gateway uptime
@@ -303,6 +302,8 @@ Build with dashboard support:
 ```bash
 make clean && make UI=1
 ```
+
+![Deadmesh Message Log](src/assets/static_messages_tab.png)
 
 ## Usage
 
