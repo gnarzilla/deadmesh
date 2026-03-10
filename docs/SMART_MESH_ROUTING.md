@@ -27,7 +27,7 @@ This gives users **explicit intent** and removes all guesswork.
 
 ## What happens when something is impossible
 
-Instead of silent timeouts or ugly 404s, deadmesh gives **helpful, honest, and occasionally funny** responses.
+Instead of silent timeouts or ugly 404s, deadmesh gives **helpful, honest, and occasionally fun** responses.
 
 **Example – trying to watch YouTube over LoRa:**
 
