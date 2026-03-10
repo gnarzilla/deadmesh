@@ -76,6 +76,19 @@ deadmesh sits in the middle:
 **Optional** (for Meshtastic CLI testing):
 - Python meshtastic package (`pip install meshtastic`)
 
+## Smart Mesh Routing – `mesh://` mode
+
+The killer feature that makes deadmesh actually *pleasant* to use on LoRa.
+
+- Type `mesh://en.wikipedia.org` instead of `http://` to get a clean, ultra-compressed, text-only version (\~98% smaller).
+- Clear, helpful denial messages when something is impossible (e.g. “YouTube would take 47 hours and 312% of your daily duty cycle” + instant alternatives).
+- Shared cache that gets smarter every day, the whole mesh becomes a living knowledge appliance.
+- Volunteers can “seed” gateways with USB sticks (we call them mesh librarians).
+
+Full details and philosophy → [SMART_MESH_ROUTING.md](docs/SMART_MESH_ROUTING.md)
+
+*(deadmesh should feel like the network is on your side.)*
+
 **Hardware** (see [Hardware](#hardware) for details):
 - Meshtastic-compatible LoRa radio (ESP32-based recommended)
 - Gateway node: Raspberry Pi or similar with Internet connection
