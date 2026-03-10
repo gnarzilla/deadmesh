@@ -7,3 +7,10 @@ get-pip.py linguist-generated
 heltec.bin linguist-vendored
 deadmesh linguist-vendored
 *.conf linguist-vendored
+
+# Hide build artifacts and docs from the language bar
+obj/** linguist-vendored
+bin/** linguist-vendored
+docs/** linguist-vendored
+tools/** linguist-vendored
+tests/** linguist-vendored
