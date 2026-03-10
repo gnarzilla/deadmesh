@@ -20,8 +20,8 @@ typedef struct {
 // SSE Stream State
 typedef struct {
     DeadlightConnection *conn;
-    GOutputStream *output;
-    GSource *update_timer;
+    GSocketConnection *socket_conn;  // Held ref — stream re-acquired each tick
+    guint update_timer_id;           // g_timeout_add_seconds id, not GSource*
     guint64 last_total_connections;
     guint64 last_bytes_transferred;
     gboolean closed;
@@ -1939,15 +1939,15 @@ static DeadlightHandlerResult api_handle_stream_endpoint(DeadlightConnection *co
     // Create SSE stream state
     SSEStreamState *state = g_new0(SSEStreamState, 1);
     state->conn = conn;
-    state->output = client_os;
+    state->socket_conn = g_object_ref(conn->client_connection);
     state->closed = FALSE;
     state->last_total_connections = conn->context->total_connections;
     state->last_bytes_transferred = conn->context->bytes_transferred;
-    
+
     // Schedule periodic updates (every 2 seconds)
-    state->update_timer = g_timeout_source_new_seconds(2);
-    g_source_set_callback(state->update_timer, sse_send_update, state, NULL);
-    g_source_attach(state->update_timer, NULL);
+    // g_timeout_add_seconds runs on the default GMainContext (main thread),
+    // which is safe — we re-acquire the output stream each tick from socket_conn.
+    state->update_timer_id = g_timeout_add_seconds(2, sse_send_update, state);
     
     // Store state in connection for cleanup
     conn->protocol_data = state;
@@ -1970,60 +1970,78 @@ static DeadlightHandlerResult api_handle_stream_endpoint(DeadlightConnection *co
  */
 static gboolean sse_send_update(gpointer user_data) {
     SSEStreamState *state = (SSEStreamState*)user_data;
-    
+
     if (state->closed) {
         g_debug("SSE: Stream %lu already closed, stopping timer", state->conn->id);
         return G_SOURCE_REMOVE;
     }
-    
+
     DeadlightContext *ctx = state->conn->context;
-    
-    // Only send if metrics changed
-    gboolean metrics_changed = 
+    GOutputStream *out = g_io_stream_get_output_stream(
+        G_IO_STREAM(state->socket_conn));
+    GError *error = NULL;
+    gboolean wrote_something = FALSE;
+
+    // Drain pending mesh SSE events (node_update, message) enqueued by
+    // the meshtastic reader thread via deadlight_sse_enqueue().
+    gchar **mesh_frames = deadlight_sse_drain(ctx);
+    if (mesh_frames) {
+        for (gint i = 0; mesh_frames[i] != NULL; i++) {
+            gsize mlen = strlen(mesh_frames[i]);
+            if (!g_output_stream_write_all(out, mesh_frames[i], mlen,
+                                           NULL, NULL, &error)) {
+                g_warning("SSE: Failed to send mesh event to client %lu: %s",
+                         state->conn->id, error ? error->message : "unknown");
+                g_clear_error(&error);
+                g_strfreev(mesh_frames);
+                sse_stream_cleanup(state);
+                return G_SOURCE_REMOVE;
+            }
+            wrote_something = TRUE;
+        }
+        g_strfreev(mesh_frames);
+    }
+
+    // Send dashboard update if proxy metrics changed
+    gboolean metrics_changed =
         (ctx->total_connections != state->last_total_connections) ||
         (ctx->bytes_transferred != state->last_bytes_transferred);
-    
-    if (!metrics_changed) {
-        // Send heartbeat to keep connection alive
+
+    if (metrics_changed) {
+        gchar *json = api_build_dashboard_json(ctx);
+        if (json) {
+            if (!sse_send_event(out, "dashboard", json, &error)) {
+                g_warning("SSE: Failed to send update to client %lu: %s",
+                         state->conn->id, error ? error->message : "unknown");
+                g_clear_error(&error);
+                g_free(json);
+                sse_stream_cleanup(state);
+                return G_SOURCE_REMOVE;
+            }
+            state->last_total_connections = ctx->total_connections;
+            state->last_bytes_transferred = ctx->bytes_transferred;
+            wrote_something = TRUE;
+            g_free(json);
+        }
+    }
+
+    // Only send a heartbeat comment if we wrote nothing else this tick.
+    // Avoids redundant writes on busy ticks and keeps the connection alive
+    // on quiet ones.
+    if (!wrote_something) {
         const gchar *heartbeat = ": heartbeat\n\n";
-        GError *error = NULL;
-        
-        if (!g_output_stream_write_all(state->output, heartbeat, strlen(heartbeat),
+        if (!g_output_stream_write_all(out, heartbeat, strlen(heartbeat),
                                        NULL, NULL, &error)) {
             g_warning("SSE: Failed to send heartbeat to client %lu: %s",
                      state->conn->id, error ? error->message : "unknown");
-            if (error) g_error_free(error);
+            g_clear_error(&error);
             sse_stream_cleanup(state);
             return G_SOURCE_REMOVE;
         }
-        
-        g_output_stream_flush(state->output, NULL, NULL);
-        return G_SOURCE_CONTINUE;
     }
-    
-    // Build dashboard JSON
-    gchar *json = api_build_dashboard_json(ctx);
-    if (!json) {
-        g_warning("SSE: Failed to build dashboard JSON for client %lu", state->conn->id);
-        return G_SOURCE_CONTINUE;
-    }
-    
-    // Send update event
-    GError *error = NULL;
-    if (!sse_send_event(state->output, "dashboard", json, &error)) {
-        g_warning("SSE: Failed to send update to client %lu: %s",
-                 state->conn->id, error ? error->message : "unknown");
-        if (error) g_error_free(error);
-        g_free(json);
-        sse_stream_cleanup(state);
-        return G_SOURCE_REMOVE;
-    }
-    
-    // Update tracked metrics
-    state->last_total_connections = ctx->total_connections;
-    state->last_bytes_transferred = ctx->bytes_transferred;
-    
-    g_free(json);
+
+    // Single flush covers all writes this tick
+    g_output_stream_flush(out, NULL, NULL);
     return G_SOURCE_CONTINUE;
 }
 
@@ -2032,18 +2050,21 @@ static gboolean sse_send_update(gpointer user_data) {
  */
 static void sse_stream_cleanup(SSEStreamState *state) {
     if (!state) return;
-    
+
     g_info("SSE: Cleaning up stream for client %lu", state->conn->id);
-    
+
     state->closed = TRUE;
-    
-    if (state->update_timer) {
-        g_source_destroy(state->update_timer);
-        g_source_unref(state->update_timer);
-        state->update_timer = NULL;
+
+    if (state->update_timer_id) {
+        g_source_remove(state->update_timer_id);
+        state->update_timer_id = 0;
     }
-    
-    state->output = NULL;
+
+    if (state->socket_conn) {
+        g_object_unref(state->socket_conn);
+        state->socket_conn = NULL;
+    }
+
     g_free(state);
 }
 
@@ -2227,9 +2248,8 @@ static gchar* api_build_dashboard_json(DeadlightContext *ctx) {
  */
 static void api_cleanup_sse_stream(DeadlightConnection *conn) {
     if (conn->protocol_data && conn->protocol == DEADLIGHT_PROTOCOL_API) {
-        // Check if this was an SSE stream by looking for SSEStreamState
         SSEStreamState *state = (SSEStreamState*)conn->protocol_data;
-        if (state && state->update_timer) {
+        if (state && state->update_timer_id) {
             sse_stream_cleanup(state);
             conn->protocol_data = NULL;
         }

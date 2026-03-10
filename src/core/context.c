@@ -38,7 +38,8 @@ DeadlightContext *deadlight_context_new(void) {
     ctx->uptime_timer = g_timer_new();
     
     g_mutex_init(&ctx->stats_mutex);
-    g_mutex_init(&ctx->sse_clients_mutex);
+    ctx->pending_sse_events = g_queue_new();
+    g_mutex_init(&ctx->pending_sse_mutex);
 
     // Set defaults
     ctx->shutdown_requested = FALSE;
@@ -102,7 +103,15 @@ void deadlight_context_free(DeadlightContext *ctx) {
 
     g_free(ctx->pool_eviction_policy);
 
-    g_mutex_clear(&ctx->sse_clients_mutex);
+    g_mutex_lock(&ctx->pending_sse_mutex);
+    if (ctx->pending_sse_events) {
+        gchar *s;
+        while ((s = g_queue_pop_head(ctx->pending_sse_events))) g_free(s);
+        g_queue_free(ctx->pending_sse_events);
+        ctx->pending_sse_events = NULL;
+    }
+    g_mutex_unlock(&ctx->pending_sse_mutex);
+    g_mutex_clear(&ctx->pending_sse_mutex);
     g_mutex_clear(&ctx->stats_mutex);
     
     // Free cached strings

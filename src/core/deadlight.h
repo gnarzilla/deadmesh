@@ -318,11 +318,11 @@ struct _DeadlightContext {
     gint         message_ring_count;
     GMutex       message_ring_mutex;
 
-    /* SSE push clients — list of open GOutputStream* watching /api/stream.
-     * The UI server registers clients here; meshtastic calls
-     * deadlight_sse_broadcast() to push node/message events.           */
-    GList   *sse_clients;
-    GMutex   sse_clients_mutex;
+    /* Pending SSE events — meshtastic appends formatted SSE frames here;
+     * api.c's SSE timer flushes them on its next tick (same thread,
+     * no cross-thread stream writes needed).                           */
+    GQueue  *pending_sse_events;   /* queue of g_strdup'd SSE frame strings */
+    GMutex   pending_sse_mutex;
 };
 
 struct _DeadlightConnection {
@@ -564,16 +564,15 @@ gboolean     deadlight_test_module(const gchar *module_name);
 const gchar *deadlight_protocol_to_string(DeadlightProtocol protocol);
 gchar       *deadlight_format_bytes(guint64 bytes);
 
-/* SSE push — broadcasts an SSE event to all connected /api/stream clients.
- * event_type is e.g. "node_update" or "message"; json_data is the payload.
- * Safe to call from any thread.                                            */
-void         deadlight_sse_broadcast(DeadlightContext *context,
-                                     const gchar *event_type,
-                                     const gchar *json_data);
+/* SSE push — enqueues an SSE event for delivery on the next api.c timer tick.
+ * Safe to call from any thread.                                             */
+void         deadlight_sse_enqueue(DeadlightContext *context,
+                                   const gchar *event_type,
+                                   const gchar *json_data);
 
-/* Register/unregister an SSE client output stream */
-void         deadlight_sse_client_add(DeadlightContext *context, GOutputStream *stream);
-void         deadlight_sse_client_remove(DeadlightContext *context, GOutputStream *stream);
+/* Drain pending SSE events — called by api.c SSE timer; returns a
+ * NULL-terminated array of frame strings (caller must g_strfreev).         */
+gchar      **deadlight_sse_drain(DeadlightContext *context);
 
 #ifdef __cplusplus
 }

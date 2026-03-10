@@ -13,86 +13,81 @@ static enum MHD_Result handle_api_nodes(DeadlightContext *context, struct MHD_Co
 static enum MHD_Result handle_api_messages(DeadlightContext *context, struct MHD_Connection *conn, const char *method);
 
 /* ─────────────────────────────────────────────────────────────
+ * JSON string escaper
+ * Handles the JSON spec (RFC 8259 §7) correctly:
+ *   - Escapes " \ and control chars U+0000–U+001F
+ *   - Passes valid UTF-8 multibyte sequences (emoji etc.) through
+ *     unchanged — g_strescape() must NOT be used as it mangles
+ *     non-ASCII bytes into octal which breaks JSON.parse().
+ * Caller must g_free() the result.
+ * ───────────────────────────────────────────────────────────── */
+static gchar *json_escape_string(const gchar *str)
+{
+    if (!str) return g_strdup("");
+    GString *out = g_string_sized_new(strlen(str) + 8);
+    for (const gchar *p = str; *p; p++) {
+        guchar c = (guchar)*p;
+        switch (c) {
+            case '"':  g_string_append(out, "\\\""); break;
+            case '\\': g_string_append(out, "\\\\"); break;
+            case '\b': g_string_append(out, "\\b");  break;
+            case '\f': g_string_append(out, "\\f");  break;
+            case '\n': g_string_append(out, "\\n");  break;
+            case '\r': g_string_append(out, "\\r");  break;
+            case '\t': g_string_append(out, "\\t");  break;
+            default:
+                if (c < 0x20) {
+                    /* Control character — escape as \uXXXX */
+                    g_string_append_printf(out, "\\u%04x", c);
+                } else {
+                    /* ASCII printable or UTF-8 multibyte — pass through */
+                    g_string_append_c(out, (gchar)c);
+                }
+        }
+    }
+    return g_string_free(out, FALSE);
+}
+
+/* ─────────────────────────────────────────────────────────────
  * SSE client registry + broadcast
  * ───────────────────────────────────────────────────────────── */
 
-void deadlight_sse_client_add(DeadlightContext *context, GOutputStream *stream)
+/* Enqueue an SSE event frame for delivery by api.c's SSE timer.
+ * Safe to call from any thread — api.c drains the queue on its own
+ * timer tick, keeping all stream writes on a single thread.        */
+void deadlight_sse_enqueue(DeadlightContext *context,
+                            const gchar *event_type,
+                            const gchar *json_data)
 {
-    g_mutex_lock(&context->sse_clients_mutex);
-    context->sse_clients = g_list_prepend(context->sse_clients,
-                                          g_object_ref(stream));
-    g_mutex_unlock(&context->sse_clients_mutex);
-}
+    if (!context || !context->pending_sse_events) return;
 
-void deadlight_sse_client_remove(DeadlightContext *context, GOutputStream *stream)
-{
-    g_mutex_lock(&context->sse_clients_mutex);
-    GList *node = g_list_find(context->sse_clients, stream);
-    if (node) {
-        g_object_unref(stream);
-        context->sse_clients = g_list_delete_link(context->sse_clients, node);
-    }
-    g_mutex_unlock(&context->sse_clients_mutex);
-}
-
-/* Payload struct for main-thread SSE dispatch */
-typedef struct {
-    DeadlightContext *context;
-    gchar            *frame;
-    gsize             frame_len;
-} SseBroadcastPayload;
-
-static gboolean sse_broadcast_on_main(gpointer user_data)
-{
-    SseBroadcastPayload *p = user_data;
-    DeadlightContext *context = p->context;
-
-    g_mutex_lock(&context->sse_clients_mutex);
-
-    GList *dead = NULL;
-    for (GList *l = context->sse_clients; l; l = l->next) {
-        GOutputStream *stream = l->data;
-        GError *err = NULL;
-        gsize written = 0;
-        gboolean ok = g_output_stream_write_all(stream,
-                                                p->frame, p->frame_len,
-                                                &written, NULL, &err);
-        if (!ok || err) {
-            g_clear_error(&err);
-            dead = g_list_prepend(dead, stream);
-        }
-    }
-
-    for (GList *l = dead; l; l = l->next) {
-        GOutputStream *stream = l->data;
-        context->sse_clients = g_list_remove(context->sse_clients, stream);
-        g_object_unref(stream);
-    }
-    g_list_free(dead);
-
-    g_mutex_unlock(&context->sse_clients_mutex);
-    g_free(p->frame);
-    g_free(p);
-    return G_SOURCE_REMOVE;
-}
-
-void deadlight_sse_broadcast(DeadlightContext *context,
-                              const gchar *event_type,
-                              const gchar *json_data)
-{
-    /* Build the frame string */
     gchar *frame = g_strdup_printf("event: %s\ndata: %s\n\n",
                                    event_type, json_data);
+    g_mutex_lock(&context->pending_sse_mutex);
+    g_queue_push_tail(context->pending_sse_events, frame);
+    g_mutex_unlock(&context->pending_sse_mutex);
+}
 
-    /* Dispatch the write onto the GLib default main context so it runs on
-     * the same thread as api.c's SSE timer — avoids concurrent writes to
-     * GOutputStream which is not thread-safe.                             */
-    SseBroadcastPayload *p = g_new0(SseBroadcastPayload, 1);
-    p->context   = context;
-    p->frame     = frame;
-    p->frame_len = strlen(frame);
+/* Drain all pending SSE frames — called by api.c timer on its thread.
+ * Returns NULL-terminated array of frame strings; caller g_strfreev()s it. */
+gchar **deadlight_sse_drain(DeadlightContext *context)
+{
+    if (!context || !context->pending_sse_events) return NULL;
 
-    g_main_context_invoke(NULL, sse_broadcast_on_main, p);
+    g_mutex_lock(&context->pending_sse_mutex);
+    guint len = g_queue_get_length(context->pending_sse_events);
+    if (len == 0) {
+        g_mutex_unlock(&context->pending_sse_mutex);
+        return NULL;
+    }
+
+    gchar **frames = g_new0(gchar *, len + 1);
+    for (guint i = 0; i < len; i++)
+        frames[i] = g_queue_pop_head(context->pending_sse_events);
+    frames[len] = NULL;
+
+    g_mutex_unlock(&context->pending_sse_mutex);
+    return frames;
 }
 
 /* ---------- Simple JSON helpers ---------- */
@@ -202,8 +197,8 @@ handle_api_nodes(DeadlightContext *context, struct MHD_Connection *conn, const c
 
             /* Escape names defensively — they come from radio and may have
              * unexpected characters                                         */
-            gchar *short_esc = g_strescape(node->short_name, NULL);
-            gchar *long_esc  = g_strescape(node->long_name,  NULL);
+            gchar *short_esc = json_escape_string(node->short_name);
+            gchar *long_esc  = json_escape_string(node->long_name);
 
             g_string_append_printf(json_str,
                 "{"
@@ -365,7 +360,7 @@ handle_api_messages(DeadlightContext *context, struct MHD_Connection *conn, cons
         if (!first) g_string_append(json_str, ",");
         first = FALSE;
 
-        gchar *text_esc = g_strescape(msg->text, NULL);
+        gchar *text_esc = json_escape_string(msg->text);
 
         g_string_append_printf(json_str, "{");
         g_string_append_printf(json_str, "\"from\":\"%08x\",", msg->from_node);
