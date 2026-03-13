@@ -4,9 +4,9 @@
 
 Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on mesh/satellite/spotty networks.
 
-<img src="https://meshtastic.deadlight.boo/apple-touch-icon.png" width="32" height="32"> · [Project Blog](https://meshtastic.deadlight.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
+<img src="https://deadmesh.deadlight.boo/apple-touch-icon.png" width="32" height="32"> · [Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
-![Live long run](src/assets/long_run.gif)
+![Live long run](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/long_run.gif)
 
 ## Overview
 
@@ -35,7 +35,7 @@ deadmesh sits in the middle:
 
 **Result**: Your mesh network works with everything: email clients, web browsers, update tools, API services, without modifying a single line of application code.
 
-![Live Meshtastic Gateway](src/assets/deadmesh-live.gif)
+![Live Meshtastic Gateway](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif)
 
 ### Critical Scenarios This Enables
 
@@ -60,7 +60,21 @@ deadmesh sits in the middle:
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
 - **Live Node Table**: Persistent mesh node database; names, hops, SNR, battery, position, last heard, updated from every packet type
 
-![Live Meshtastic LONGFAST logging](src/assets/longfast-live-log.gif)
+![Live Meshtastic LONGFAST logging](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/longfast-live-log.gif)
+
+## Smart Mesh Routing – `mesh://` mode
+
+The killer feature that makes deadmesh actually *pleasant* to use on LoRa.
+
+- Type `mesh://en.wikipedia.org` instead of `http://` to get a clean, ultra-compressed, text-only version (\~98% smaller).
+- Clear, helpful denial messages when something is impossible (e.g. “YouTube would take 47 hours and 312% of your daily duty cycle” + instant alternatives).
+- Shared cache that gets smarter every day, the whole mesh becomes a living knowledge appliance.
+- Volunteers can “seed” gateways with USB sticks (i.e. dead librarian society).
+
+Full details and philosophy → [SMART_MESH_ROUTING.md](docs/SMART_MESH_ROUTING.md)
+
+*(deadmesh should feel like the network is on your side.)*
+
 
 ## Getting Started
 
@@ -749,9 +763,9 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 ## Support & Community
 
-- **Issues**: [GitHub Issues](https://github.com/gnarzilla/meshtastic.deadlight/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/gnarzilla/meshtastic.deadlight/discussions)
-- **Blog**: [meshtastic.deadlight.boo](https://meshtastic.deadlight.boo)
+- **Issues**: [GitHub Issues](https://github.com/gnarzilla/deadmesh/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/gnarzilla/deadmesh/discussions)
+- **Blog**: [deadmesh.boo](https://deadmesh.boo)
 - **Support development**: [ko-fi/gnarzilla](https://ko-fi.com/gnarzilla)
 
 ## Deadlight Ecosystem

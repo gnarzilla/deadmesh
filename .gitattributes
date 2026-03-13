@@ -1,0 +1,16 @@
+# Tell Linguist to completely ignore get-pip.py for language stats
+get-pip.py linguist-vendored
+get-pip.py linguist-generated
+
+# Optional: also hide the binary and other non-code stuff if you want a cleaner bar
+*.bin linguist-vendored
+heltec.bin linguist-vendored
+deadmesh linguist-vendored
+*.conf linguist-vendored
+
+# Hide build artifacts and docs from the language bar
+obj/** linguist-vendored
+bin/** linguist-vendored
+docs/** linguist-vendored
+tools/** linguist-vendored
+tests/** linguist-vendored
