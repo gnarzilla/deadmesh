@@ -1,5 +1,5 @@
 /**
- * deadmesh - Meshtastic Transport Plugin (revised)
+ * deadmesh - Meshtastic Transport Plugin
  *
  * Wires the Meshtastic serial radio into the deadlight proxy core.
  *

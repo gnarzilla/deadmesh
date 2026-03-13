@@ -346,6 +346,7 @@ struct _DeadlightConnection {
     gboolean              ssl_established;
     gboolean              will_use_ssl;
     gboolean              is_connect_tunnel;
+    gboolean              tls_passthrough;
     GByteArray           *client_buffer;
     GByteArray           *upstream_buffer;
     guint64               bytes_client_to_upstream;

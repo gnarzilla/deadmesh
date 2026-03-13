@@ -2,16 +2,16 @@
 #include <string.h>
 #include <json-glib/json-glib.h>
 #include <time.h>
-#include <sys/stat.h>  
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include "smtp.h"
 #include "plugins/ratelimiter.h"
 #include "core/utils.h"   
 #include "core/logging.h"  
 #include "plugins/ratelimiter.h" 
 #include "core/logging.h"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 
 typedef struct {
     gchar *domain;
@@ -1910,17 +1910,6 @@ static DeadlightHandlerResult api_handle_stream_endpoint(DeadlightConnection *co
     // Send SSE headers
     GOutputStream *client_os = g_io_stream_get_output_stream(
         G_IO_STREAM(conn->client_connection));
-
-    GSocket *sock = g_socket_connection_get_socket(conn->client_connection);
-    if (sock) {
-        g_socket_set_keepalive(sock, TRUE);
-        // TCP keepalive: start after 60s idle, probe every 10s, drop after 3 failures
-        int fd = g_socket_get_fd(sock);
-        int val;
-        val = 60; setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &val, sizeof(val));
-        val = 10; setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val));
-        val = 3;  setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &val, sizeof(val));
-    }
     
     const gchar *sse_headers = 
         "HTTP/1.1 200 OK\r\n"
@@ -1958,6 +1947,20 @@ static DeadlightHandlerResult api_handle_stream_endpoint(DeadlightConnection *co
     state->last_total_connections = conn->context->total_connections;
     state->last_bytes_transferred = conn->context->bytes_transferred;
 
+    // Enable TCP keepalive so the kernel detects dead clients (sleep/disconnect)
+    // without waiting for a write to fail.
+    {
+        GSocket *sock = g_socket_connection_get_socket(conn->client_connection);
+        if (sock) {
+            g_socket_set_keepalive(sock, TRUE);
+            int fd = g_socket_get_fd(sock);
+            int val;
+            val = 60; setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &val, sizeof(val));
+            val = 10; setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val));
+            val = 3;  setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &val, sizeof(val));
+        }
+    }
+
     // Schedule periodic updates (every 2 seconds)
     // g_timeout_add_seconds runs on the default GMainContext (main thread),
     // which is safe — we re-acquire the output stream each tick from socket_conn.
@@ -1990,13 +1993,19 @@ static gboolean sse_send_update(gpointer user_data) {
         return G_SOURCE_REMOVE;
     }
 
-    GSocket *sock = g_socket_connection_get_socket(state->socket_conn);
-    if (sock) {
-        GIOCondition cond = g_socket_condition_check(sock, G_IO_IN | G_IO_HUP | G_IO_ERR);
-        if (cond & (G_IO_HUP | G_IO_ERR)) {
-            g_debug("SSE: Client %lu hung up, cleaning up", state->conn->id);
-            sse_stream_cleanup(state);
-            return G_SOURCE_REMOVE;
+    // Pre-write liveness check: if the socket has HUP or ERR pending, the
+    // client is already gone. Clean up before attempting any write.
+    {
+        GSocket *sock = g_socket_connection_get_socket(state->socket_conn);
+        if (sock) {
+            GIOCondition cond = g_socket_condition_check(sock,
+                G_IO_IN | G_IO_HUP | G_IO_ERR);
+            if (cond & (G_IO_HUP | G_IO_ERR)) {
+                g_debug("SSE: Stream %lu socket dead (HUP/ERR), cleaning up",
+                        state->conn->id);
+                sse_stream_cleanup(state);
+                return G_SOURCE_REMOVE;
+            }
         }
     }
 

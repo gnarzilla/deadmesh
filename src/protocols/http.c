@@ -265,32 +265,67 @@ static DeadlightHandlerResult handle_connect(DeadlightConnection *conn, GError *
     }
     g_free(host); // The host string is no longer needed after this point.
 
+    // Send 200 to client — from here, client will begin TLS handshake
     const gchar *response = "HTTP/1.1 200 Connection Established\r\n\r\n";
-    GOutputStream *client_output = g_io_stream_get_output_stream(G_IO_STREAM(conn->client_connection));
-    if (g_output_stream_write_all(client_output, response, strlen(response), NULL, NULL, error) == FALSE) {
+    GOutputStream *client_output = g_io_stream_get_output_stream(
+        G_IO_STREAM(conn->client_connection));
+    if (!g_output_stream_write_all(client_output, response, strlen(response),
+                                   NULL, NULL, error)) {
         return HANDLER_ERROR;
     }
 
-    if (conn->context->ssl_intercept_enabled) {
-        if (deadlight_ssl_intercept_connection(conn, error)) {
-            g_info("Connection %lu: Tunneling with intercepted client TLS.", conn->id);
-            g_info("Connection %lu: Tunneling with upstream TLS.", conn->id);
-            
-            if (start_ssl_tunnel_blocking(conn, error)) {
-                return HANDLER_SUCCESS_CLEANUP_NOW;
-            } else {
-                return HANDLER_ERROR;
-            }
-        } else {
-            return HANDLER_ERROR;
-        }
-    } else {
-        // Non-intercepted CONNECT - plain TCP tunnel
-        g_info("Connection %lu: SSL intercept disabled. Starting plain TCP tunnel.", conn->id);
-        if (deadlight_network_tunnel_data(conn, error)) {
-            return HANDLER_SUCCESS_CLEANUP_NOW;
-        } else {
-            return HANDLER_ERROR;
-        }
+    if (!conn->context->ssl_intercept_enabled) {
+        g_info("Connection %lu: SSL intercept disabled — plain TCP tunnel", conn->id);
+        return deadlight_network_tunnel_data(conn, error)
+            ? HANDLER_SUCCESS_CLEANUP_NOW
+            : HANDLER_ERROR;
     }
+
+    // Attempt interception
+    GError *intercept_error = NULL;
+    if (deadlight_ssl_intercept_connection(conn, &intercept_error)) {
+        // Interception succeeded — tunnel both TLS sides
+        g_info("Connection %lu: Tunneling with intercepted client TLS.", conn->id);
+        g_info("Connection %lu: Tunneling with upstream TLS.", conn->id);
+
+        GError *tunnel_error = NULL;
+        gboolean ok = start_ssl_tunnel_blocking(conn, &tunnel_error);
+        if (!ok && tunnel_error) {
+            g_warning("Connection %lu: TLS tunnel error: %s",
+                      conn->id, tunnel_error->message);
+            g_error_free(tunnel_error);
+        }
+        return ok ? HANDLER_SUCCESS_CLEANUP_NOW : HANDLER_ERROR;
+    }
+
+    // Interception declined or failed — distinguish the two cases
+    if (conn->tls_passthrough) {
+        // Intentional passthrough: upstream is h2 or otherwise non-interceptable.
+        // We already have an upstream TLS connection established.
+        // Shuttle raw bytes between the two sides.
+        g_info("Connection %lu: TLS passthrough for %s (upstream h2 or non-interceptable)",
+               conn->id, conn->target_host);
+        g_clear_error(&intercept_error);
+
+        // Use the raw socket connections — bypass TLS objects entirely.
+        // The upstream_tls wraps upstream_connection; we need the underlying
+        // TCP stream to do a raw passthrough since we're not terminating TLS.
+        //
+        // At this point the client has already started its own TLS handshake
+        // directly to the upstream (from the client's perspective, we're just
+        // a dumb pipe). We forward whatever bytes arrive, encrypted and opaque.
+        deadlight_network_tunnel_socket_connections(
+            conn->client_connection,
+            conn->upstream_connection
+        );
+        return HANDLER_SUCCESS_CLEANUP_NOW;
+    }
+
+    // Genuine interception failure
+    if (intercept_error) {
+        g_warning("Connection %lu: SSL intercept failed for %s: %s",
+                  conn->id, conn->target_host, intercept_error->message);
+        g_propagate_error(error, intercept_error);
+    }
+    return HANDLER_ERROR;
 }

@@ -588,21 +588,59 @@ gboolean deadlight_ssl_intercept_connection(DeadlightConnection *conn, GError **
     g_return_val_if_fail(conn->client_connection != NULL, FALSE);
     g_return_val_if_fail(conn->target_host != NULL, FALSE);
 
-    // Establish upstream TLS (may reuse from pool)
     if (!deadlight_network_establish_upstream_ssl(conn, error)) {
         return FALSE;
     }
 
-    // Generate or retrieve cached certificate
-    gchar *pem_data = get_host_certificate(conn->context->ssl, conn->target_host, conn, error);
-    if (!pem_data) {
+    // Read what the upstream actually negotiated
+    gchar *upstream_protocol = NULL;
+    g_object_get(conn->upstream_tls, "negotiated-protocol", &upstream_protocol, NULL);
+
+    if (g_strcmp0(upstream_protocol, "h2") == 0) {
+        g_info("Connection %lu: Upstream %s requires h2 — will reconnect for passthrough",
+            conn->id, conn->target_host);
+        g_free(upstream_protocol);
+
+        // Close the TLS session we established — we can't reuse it for passthrough
+        g_object_unref(conn->upstream_tls);
+        conn->upstream_tls = NULL;
+        conn->ssl_established = FALSE;
+
+        // Close and reopen the underlying TCP connection
+        g_io_stream_close(G_IO_STREAM(conn->upstream_connection), NULL, NULL);
+        g_object_unref(conn->upstream_connection);
+        conn->upstream_connection = NULL;
+
+        // Reconnect raw TCP — the client will now do TLS directly to upstream
+        GError *reconnect_error = NULL;
+        conn->upstream_connection = deadlight_network_connect_tcp(
+            conn->context,
+            conn->target_host,
+            conn->target_port,
+            &reconnect_error
+        );
+        if (!conn->upstream_connection) {
+            g_warning("Connection %lu: Passthrough reconnect failed for %s: %s",
+                    conn->id, conn->target_host,
+                    reconnect_error ? reconnect_error->message : "unknown");
+            g_clear_error(&reconnect_error);
+            return FALSE;
+        }
+
+        conn->tls_passthrough = TRUE;
         return FALSE;
     }
-    
+    gchar *pem_data = get_host_certificate(conn->context->ssl,
+                                            conn->target_host, conn, error);
+    if (!pem_data) {
+        g_free(upstream_protocol);
+        return FALSE;
+    }
 
     GTlsCertificate *tls_cert = g_tls_certificate_new_from_pem(pem_data, -1, error);
     g_free(pem_data);
     if (!tls_cert) {
+        g_free(upstream_protocol);
         return FALSE;
     }
 
@@ -613,34 +651,40 @@ gboolean deadlight_ssl_intercept_connection(DeadlightConnection *conn, GError **
     );
     g_object_unref(tls_cert);
     if (!conn->client_tls) {
+        g_free(upstream_protocol);
         return FALSE;
     }
-    
-    const gchar *alpn_protos[] = {"http/1.1", NULL};
-    g_object_set(conn->client_tls,
-                "advertised-protocols", alpn_protos,
-                NULL);
 
-    gchar **client_protos = NULL;
-    g_object_get(conn->client_tls,
-                "advertised-protocols", &client_protos,
-                NULL);
-    if (client_protos) {
-        for (int i = 0; client_protos[i]; i++) {
-            g_debug("Client advertised protocol: %s", client_protos[i]);
-        }
-        g_strfreev(client_protos);
+    // Advertise what upstream actually accepted, not a hardcoded list.
+    // If upstream gave us nothing, default to http/1.1.
+    if (upstream_protocol && g_strcmp0(upstream_protocol, "http/1.1") == 0) {
+        const gchar *alpn[] = {"http/1.1", NULL};
+        g_object_set(conn->client_tls, "advertised-protocols", alpn, NULL);
+    } else {
+        const gchar *alpn[] = {"http/1.1", NULL};
+        g_object_set(conn->client_tls, "advertised-protocols", alpn, NULL);
     }
+    // Note: both branches are identical for now — the useful expansion is
+    // when you add h2 interception support later, you slot it in here.
+    g_free(upstream_protocol);
 
     if (!g_tls_connection_handshake(conn->client_tls, NULL, error)) {
-        g_warning("Client TLS handshake failed for conn %lu to host %s: %s", 
+        g_warning("Client TLS handshake failed for conn %lu to host %s: %s",
                   conn->id, conn->target_host, (*error)->message);
         g_object_unref(conn->client_tls);
         conn->client_tls = NULL;
         return FALSE;
     }
 
-    g_info("Client TLS interception established for conn %lu to host %s", conn->id, conn->target_host);
+    // Log what was actually negotiated — not what we set
+    gchar *negotiated = NULL;
+    g_object_get(conn->client_tls, "negotiated-protocol", &negotiated, NULL);
+    g_info("Connection %lu: Client TLS negotiated: %s for host %s",
+           conn->id, negotiated ? negotiated : "(none)", conn->target_host);
+    g_free(negotiated);
+
+    g_info("Client TLS interception established for conn %lu to host %s",
+           conn->id, conn->target_host);
     conn->ssl_established = TRUE;
     return TRUE;
 }
