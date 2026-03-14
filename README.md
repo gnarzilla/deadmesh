@@ -688,12 +688,16 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 - [x] Tabbed dashboard panel (Mesh Nodes / Proxy Links)
 - [x] `/api/nodes` endpoint: full node table as JSON
 - [x] Node table persisted in `DeadlightContext` accessible to all subsystems
+- [x] SSE push for node table updates (not polling anymore, live SSE)
+- [x] Text message panel: display mesh chat in dashboard
+- [x] SSE stream stability (cross-thread write fix, 6+ hour uptime confirmed)
+- [x] TCP keepalive + stale connection detection (HUP/ERR pre-check)
+- [x] UTF-8/emoji correct JSON escaping in node names and messages
+- [x] Ghost connection cleanup (Chrome prefetch/prerender connections detected and cleaned within 2s)
 
 ### v1.2 (Next)
 - [ ] End-to-end proxy session test over real LoRa
 - [ ] Node topology map: visualize mesh graph from hop data
-- [ ] Text message panel: display mesh chat in dashboard
-- [ ] SSE push for node table updates (currently polls every 5s)
 - [ ] Adaptive fragmentation based on live mesh conditions
 - [ ] Exponential backoff retry
 - [ ] Android client app (native deadmesh on-device)
@@ -802,4 +806,5 @@ Includes:
 
 ---
 
-**Status**: v1.1 — proxy verified, mesh serial active, 95+ nodes visible, live dashboard with node table | **Maintained by**: [@gnarzilla](https://github.com/gnarzilla) | [deadlight.boo](https://deadlight.boo)
+**Status**: v1.1 — proxy verified, mesh serial active, 90+ nodes visible, 
+live dashboard with SSE streaming (6h+ uptime confirmed), emoji/UTF-8 correct | **Maintained by**: [@gnarzilla](https://github.com/gnarzilla) | [deadlight.boo](https://deadlight.boo)
