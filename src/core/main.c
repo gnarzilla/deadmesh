@@ -635,7 +635,7 @@ static void print_banner(void) {
     g_print("═══════════════════════════════════════════════════════════\n");
     g_print("                         deadmesh                          \n");
     g_print("           Internet-over-LoRa mesh gateway v%s          \n", VERSION);
-    g_print("                  https://deadlight.boo                    \n");
+    g_print("                  https://deadmesh.boo                     \n");
     g_print("═══════════════════════════════════════════════════════════\n");
     g_print("\n");
 }
@@ -679,7 +679,7 @@ int main(int argc, char *argv[]) {
     g_option_context_add_main_entries(context, entries, NULL);
     g_option_context_set_description(context,
         "deadmesh v" DEADMESH_VERSION " — part of the Deadlight ecosystem\n"
-        "https://deadlight.boo  |  https://meshtastic.deadlight.boo");
+        "https://deadmesh.boo  |  https://deadlight.boo");
 
     if (!g_option_context_parse(context, &argc, &argv, &error)) {
         g_printerr("Option parsing failed: %s\n", error->message);
