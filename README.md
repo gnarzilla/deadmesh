@@ -2,7 +2,7 @@
 
 **A resilient text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
-Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on mesh/satellite/spotty networks.
+Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on low-bandwidth, high-latency, and intermittently connected networks.
 
 <img src="https://deadmesh.deadlight.boo/apple-touch-icon.png" width="32" height="32"> · [Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
