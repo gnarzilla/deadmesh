@@ -1,6 +1,6 @@
 # deadmesh
 
-**Low-bandwidth Internet gateway for LoRa mesh networks: Update your blog from a can on a string from the smoldering rubble.**
+**A resilient text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
 Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on mesh/satellite/spotty networks.
 
