@@ -559,7 +559,9 @@ Meshtastic uses a length-prefixed binary protocol over serial:
 └────────┴────────┴───────────┴───────────┴─────────────────┘
 ```
 
-The framing layer handles sync recovery — if magic bytes are lost mid-stream, the state machine re-synchronizes automatically.
+The framing layer handles sync recovery, if magic bytes are lost mid-stream, the state machine re-synchronizes automatically.
+
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for LoRa to socket abstraction layer.
 
 ### Protocol Detection
 
