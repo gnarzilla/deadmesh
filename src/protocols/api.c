@@ -2023,7 +2023,7 @@ static gboolean sse_send_update(gpointer user_data) {
             gsize mlen = strlen(mesh_frames[i]);
             if (!g_output_stream_write_all(out, mesh_frames[i], mlen,
                                            NULL, NULL, &error)) {
-                g_warning("SSE: Failed to send mesh event to client %lu: %s",
+                g_debug("SSE: Stream %lu closed mid-write (client disconnected): %s",
                          state->conn->id, error ? error->message : "unknown");
                 g_clear_error(&error);
                 g_strfreev(mesh_frames);
@@ -2044,7 +2044,7 @@ static gboolean sse_send_update(gpointer user_data) {
         gchar *json = api_build_dashboard_json(ctx);
         if (json) {
             if (!sse_send_event(out, "dashboard", json, &error)) {
-                g_warning("SSE: Failed to send update to client %lu: %s",
+                g_debug("SSE: Failed to send update to client %lu: %s",
                          state->conn->id, error ? error->message : "unknown");
                 g_clear_error(&error);
                 g_free(json);
@@ -2065,7 +2065,7 @@ static gboolean sse_send_update(gpointer user_data) {
         const gchar *heartbeat = ": heartbeat\n\n";
         if (!g_output_stream_write_all(out, heartbeat, strlen(heartbeat),
                                        NULL, NULL, &error)) {
-            g_warning("SSE: Failed to send heartbeat to client %lu: %s",
+            g_debug("SSE: Failed to send heartbeat to client %lu: %s",
                      state->conn->id, error ? error->message : "unknown");
             g_clear_error(&error);
             sse_stream_cleanup(state);
