@@ -792,6 +792,15 @@ static void cleanup_connection_internal(DeadlightConnection *conn, gboolean remo
         gboolean use_ssl = conn->upstream_tls != NULL;
         gboolean should_pool = FALSE;
         const gchar *reason = "unknown";
+
+        /* Never pool upstream connections from mesh-origin requests —
+        * mesh round-trips take 30s+, far beyond any server keep-alive
+        * window. The pooled connection will always be stale by the time
+        * the next mesh request arrives.                                */
+        if (conn->mesh_source_node != 0) {
+            reason = "mesh origin";
+            goto skip_pool;
+        }
         
         // Check 1: Socket health
         GSocket *socket = g_socket_connection_get_socket(conn->upstream_connection);
@@ -888,6 +897,7 @@ static void cleanup_connection_internal(DeadlightConnection *conn, gboolean remo
                     break;
             }
         }
+        skip_pool:
         if (should_pool) {
             g_info("Connection %lu: Returning to pool: %s:%d (SSL=%d, reason=%s)",
                 conn->id, conn->target_host, conn->target_port, use_ssl, reason);

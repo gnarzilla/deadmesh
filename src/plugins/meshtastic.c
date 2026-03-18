@@ -575,6 +575,7 @@ static gpointer reader_thread_func(gpointer user_data) {
 static void handle_incoming_frame(MeshtasticPlugin *mp,
                                    DeadlightContext *context,
                                    const MeshFrame *frame) {
+    g_debug("client: incoming frame %u bytes", frame->len);
     meshtastic_FromRadio from_radio = meshtastic_FromRadio_init_default;
 
     /* NOTE: do NOT pre-wire decoded.payload here — nanopb zeros the
@@ -618,6 +619,12 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
         /* ── MeshPacket ─────────────────────────────────────── */
         case meshtastic_FromRadio_packet_tag: {
             meshtastic_MeshPacket *pkt = &from_radio.payload_variant.packet;
+
+            /* ADD THIS */
+            g_debug("client: packet_tag from=%08x to=%08x id=%08x portnum=%d variant=%d",
+                    pkt->from, pkt->to, pkt->id,
+                    (int)pkt->payload_variant.decoded.portnum,
+                    pkt->which_payload_variant);
 
             /* Update node table on every decoded packet — hops + SNR */
             if (pkt->which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
