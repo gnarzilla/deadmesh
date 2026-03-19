@@ -1169,6 +1169,11 @@ static gboolean send_chunk(MeshtasticPlugin *mp,
         return FALSE;
     }
 
+    /* LONG_FAST airtime: ~500ms per 220-byte packet at SF9/BW250.
+    * Sleep slightly under to keep the TX queue fed without overflowing it. */
+    if (seq < total - 1)          /* no delay after last chunk */
+        g_usleep(450 * 1000);
+
     mp->frames_sent++;
     g_debug("Meshtastic: sent chunk %u/%u for conn %lu (%zu bytes)",
              seq + 1, total, conn->id, len);
