@@ -2,7 +2,7 @@
 
 **A resilient text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
-Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) — secure, performant, privacy-focused tools for resilient connectivity on low-bandwidth, high-latency, and intermittently connected networks.
+Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on low-bandwidth, high-latency, and intermittently connected networks.
 
 <img src="https://deadmesh.deadlight.boo/apple-touch-icon.png" width="32" height="32"> · [Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](#real-world-use-cases) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
@@ -10,7 +10,7 @@ Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosyst
 
 ## Overview
 
-**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols — HTTP/HTTPS, email, DNS, FTP — as if they had normal connectivity.
+**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols: HTTP/HTTPS, email, DNS, FTP — as if they had normal connectivity.
 
 **What makes this different from other mesh solutions:**
 - Standard protocols work unchanged: browse websites, send email, use apps
@@ -27,7 +27,7 @@ Think of it as giving your Meshtastic network the capabilities of a satellite te
 
 deadmesh is a proxy. But with caching fully built out, it becomes something more interesting: a **content-addressed network that happens to speak HTTP**.
 
-Once a gateway has seen a piece of content, it costs zero airtime to serve it again — to anyone on the mesh, forever. Wikipedia's entire English text corpus is about 4GB as clean text. That fits on a Raspberry Pi SD card. A fully seeded gateway *is* Wikipedia, not a proxy to it — locally, instantly, with no uplink required. At that point the constraint shifts from bandwidth to curation, which is a much more human-solvable problem. That's what the [mesh librarian](#the-knowledge-appliance--mesh-librarians) model is really about.
+Once a gateway has seen a piece of content, it costs zero airtime to serve it again, to anyone on the mesh, forever. Wikipedia's entire English text corpus is about 4GB as clean text. That fits on a Raspberry Pi SD card. A fully seeded gateway *is* Wikipedia, not a proxy to it; locally, instantly, with no uplink required. At that point the constraint shifts from bandwidth to curation, which is a much more human-solvable problem. That's what the [mesh librarian](#the-knowledge-appliance--mesh-librarians) model is really about.
 
 This makes deadmesh an exit ramp from the carrier model, not just a resilience tool. Disaster response and rural connectivity are real use cases, but so is the everyday one: **a $50 hardware investment that routes around the need for a cellular data plan**, for anything that isn't a live video call.
 
@@ -42,7 +42,7 @@ deadmesh sits in the middle:
 2. **Internet side**: Speaks every protocol your applications already use
 3. **Bridges transparently**: Fragments outgoing requests, reassembles incoming responses
 
-**Result**: Your mesh network works with everything — email clients, web browsers, update tools, API services — without modifying a single line of application code.
+**Result**: Your mesh network works with everything: email clients, web browsers, update tools, API services. Without modifying a single line of application code.
 
 The key architectural insight is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, forever, without modification. Every protocol deadmesh adds benefits every application simultaneously.
 
@@ -86,14 +86,14 @@ The feature that makes deadmesh actually *pleasant* to use on LoRa — and the f
 
 ### The Knowledge Appliance & Mesh Librarians
 
-A warm deadmesh cache isn't just faster — it's qualitatively different. Content served from cache costs **zero airtime**. Zero duty cycle. Zero waiting.
+A warm deadmesh cache isn't just faster, it's qualitatively different. Content served from cache costs **zero airtime**. Zero duty cycle. Zero waiting.
 
 This compounds over time:
 - **First week**: mostly empty, proxying everything live
 - **Month 3**: popular articles, weather endpoints, medical guides, maps already cached locally
 - **Year 1**: the mesh becomes dramatically more useful every single day, without any additional infrastructure
 
-Volunteers can accelerate this by loading curated content onto a USB stick and physically walking it to gateways — seeding them with Wikipedia, repair manuals, local maps, survival guides. The network gets smarter every time someone goes for a walk. These are the **mesh librarians**, and it's possibly the most wholesome job in off-grid networking.
+Volunteers can accelerate this by loading curated content onto a USB stick and physically walking it to gateways, seeding them with Wikipedia, repair manuals, local maps, survival guides. The network gets smarter every time someone goes for a walk. These are the **mesh librarians**, and it's possibly the most wholesome job in off-grid networking.
 
 At full build-out, a well-seeded gateway holds more reference material than most public libraries, serves it instantly to anyone within LoRa range, and costs nothing to operate beyond solar power and a $30 radio.
 
