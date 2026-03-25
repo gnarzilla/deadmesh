@@ -1123,7 +1123,7 @@ static gboolean send_chunk(MeshtasticPlugin *mp,
     packet.which_payload_variant = meshtastic_MeshPacket_decoded_tag;
     packet.payload_variant.decoded = pb_data;
     packet.from                  = mp->local_node_id;
-    packet.to                    = 0xFFFFFFFF;
+    packet.to                    = conn->mesh_source_node;
     packet.channel               = 0;
     packet.id                    = (uint32_t)g_random_int();
     packet.hop_limit             = 3;
