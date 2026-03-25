@@ -329,23 +329,13 @@ int client_send_fn(const uint8_t *payload, size_t len,
 
 static void handle_incoming_frame(ClientTransport *ct,
                                    const MeshFrame *frame) {
-    /* Pre-allocate a decode buffer for Data.payload before decoding.
-     * We set the callback on the nested field path so nanopb calls it
-     * when it decodes the packet's Data.payload bytes field.          */
-    uint8_t    payload_buf[512];
-    PbDecodeCtx decode_ctx = { payload_buf, 0, sizeof(payload_buf) };
 
+    /* Pass 1: decode FromRadio with NO payload callback pre-wired.
+     * nanopb zeroes the oneof union when it writes packet_tag, so any
+     * callback set on packet.payload_variant.decoded.payload is destroyed
+     * before it fires.  We get from/to/portnum here; payload comes in
+     * pass 2 via a direct meshtastic_Data decode on the raw wire bytes. */
     meshtastic_FromRadio from_radio = meshtastic_FromRadio_init_default;
-
-    /* Pre-set the decode callback on the packet's decoded.payload field.
-     * nanopb will call it if and when it decodes a packet variant with a
-     * decoded (not encrypted) payload.                                  */
-    from_radio.payload_variant.packet
-              .payload_variant.decoded
-              .payload.funcs.decode = payload_decode_cb;
-    from_radio.payload_variant.packet
-              .payload_variant.decoded
-              .payload.arg          = &decode_ctx;
 
     pb_istream_t istream = pb_istream_from_buffer(frame->payload, frame->len);
     if (!pb_decode(&istream, meshtastic_FromRadio_fields, &from_radio)) {
@@ -362,90 +352,17 @@ static void handle_incoming_frame(ClientTransport *ct,
                 g_info("client: local node ID detected: %08x",
                        ct->local_node_id);
             }
-            break;
+            return;
 
         case meshtastic_FromRadio_config_complete_id_tag:
             g_info("client: mesh state sync complete (id=%u)",
                    from_radio.payload_variant.config_complete_id);
-            break;
+            return;
 
-        case meshtastic_FromRadio_packet_tag: {
-            meshtastic_MeshPacket *pkt = &from_radio.payload_variant.packet;
-            
-            if (pkt->which_payload_variant != meshtastic_MeshPacket_decoded_tag)
-                break; /* encrypted — can't handle */
+        case meshtastic_FromRadio_packet_tag:
+            break;  /* handled below */
 
-            int portnum = (int)pkt->payload_variant.decoded.portnum;
-
-            /* decoded payload length (set by nanopb callback) */
-            size_t payload_len = decode_ctx.len;
-
-            g_debug("Received packet_tag from=0x%08x to=0x%08x id=0x%08x port=%d len=%zu",
-                    pkt->from, pkt->to, pkt->id, portnum, payload_len);
-
-            if (portnum != (int)ct->custom_port)
-                break;
-
-            if (pkt->from != ct->gateway_node_id) {
-                g_debug("client: portnum=%d from unknown node %08x (expected %08x)",
-                        portnum, pkt->from, ct->gateway_node_id);
-                break;
-            }
-
-            /* decode_ctx.buf now holds the raw chunk bytes (set by callback) */
-            const uint8_t *raw     = payload_buf;
-            size_t         raw_len = decode_ctx.len;
-
-            if (raw_len < 12) {
-                g_warning("client: response chunk too short (%zu bytes)", raw_len);
-                break;
-            }
-
-            uint32_t logical_session_id = 0;
-            uint32_t seq_num      = 0;
-            uint32_t total_chunks = 0;
-            memcpy(&logical_session_id, raw,     4);
-            memcpy(&seq_num,            raw + 4, 4);
-            memcpy(&total_chunks,       raw + 8, 4);
-
-            const uint8_t *chunk_data = raw + 12;
-            size_t         chunk_len  = raw_len - 12;
-
-            /* Key on logical_session_id from payload, not pkt->id */
-            MeshSession *session = mesh_session_get_or_create(
-                ct->sessions, ct->gateway_node_id, logical_session_id);
-
-            if (seq_num == 0 || session->expected_chunks == 0)
-                mesh_session_init_reassembly(session, total_chunks);
-
-            bool complete = mesh_session_record_chunk(
-                session, seq_num, chunk_data, chunk_len);
-
-            ct->frames_recv++;
-            g_debug("client: response chunk %u/%u session=%08x",
-                    seq_num + 1, total_chunks, logical_session_id);
-
-            if (!complete)
-                break;
-
-            /* All chunks in — push to the MeshStream pipe */
-            if (session->user_data) {
-                MeshStream *ms = (MeshStream *)session->user_data;
-                mesh_stream_push_data(ms,
-                                      session->assembly_buf->data,
-                                      session->assembly_buf->len);
-                g_info("client: response complete — pushed %u bytes session=%08x",
-                       session->assembly_buf->len, logical_session_id);
-            } else {
-                g_warning("client: session %08x complete but no MeshStream "
-                          "assigned", logical_session_id);
-            }
-
-            mesh_session_init_reassembly(session, 0);
-            break;
-        }
-
-        /* Suppress startup noise */
+        /* suppress startup noise */
         case meshtastic_FromRadio_config_tag:
         case meshtastic_FromRadio_moduleConfig_tag:
         case meshtastic_FromRadio_channel_tag:
@@ -456,13 +373,202 @@ static void handle_incoming_frame(ClientTransport *ct,
         case meshtastic_FromRadio_fileInfo_tag:
         case meshtastic_FromRadio_deviceuiConfig_tag:
         case meshtastic_FromRadio_log_record_tag:
-            break;
+            return;
 
         default:
             g_debug("client: unhandled FromRadio variant %d",
                     from_radio.which_payload_variant);
-            break;
+            return;
     }
+
+    /* ── packet_tag path ──────────────────────────────────────── */
+    meshtastic_MeshPacket *pkt = &from_radio.payload_variant.packet;
+
+    if (pkt->which_payload_variant != meshtastic_MeshPacket_decoded_tag) {
+        g_debug("client: encrypted packet from %08x — skipping", pkt->from);
+        return;
+    }
+
+    int portnum = (int)pkt->payload_variant.decoded.portnum;
+
+    g_debug("client: packet from=%08x to=%08x port=%d",
+            pkt->from, pkt->to, portnum);
+
+    if (portnum != (int)ct->custom_port)
+        return;
+
+    if (pkt->from != ct->gateway_node_id) {
+        g_debug("client: portnum=%d from unknown node %08x (expected %08x)",
+                portnum, pkt->from, ct->gateway_node_id);
+        return;
+    }
+
+    /* Pass 2: manual wire scan to extract the Data submessage bytes,
+     * then decode meshtastic_Data directly with callbacks pre-wired.
+     *
+     * We cannot pre-wire payload_decode_cb before pb_decode() on
+     * FromRadio/MeshPacket because nanopb zeroes each oneof union
+     * before writing the selected variant, destroying the callback.
+     *
+     * Strategy: walk the raw protobuf bytes to find:
+     *   FromRadio field 2 (packet, LEN)  →  MeshPacket field 4 (decoded, LEN)
+     * then pb_decode meshtastic_Data directly — it has no oneof, so
+     * the callback pointer survives.
+     *
+     * Wire format: (field_number << 3) | wire_type
+     *   wire_type 0 = varint   wire_type 2 = LEN   wire_type 5 = 32-bit
+     *   wire_type 1 = 64-bit
+     */
+
+    uint8_t     payload_buf[512];
+    PbDecodeCtx decode_ctx  = { payload_buf, 0, sizeof(payload_buf) };
+    gboolean    payload_ok  = FALSE;
+
+    #define READ_VARINT(ptr, endp, out, ok) do {                        \
+        uint64_t _v = 0; int _s = 0; (ok) = false;                     \
+        while ((ptr) < (endp)) {                                        \
+            uint8_t _b = *(ptr)++;                                      \
+            _v |= (uint64_t)(_b & 0x7F) << _s; _s += 7;               \
+            if (!(_b & 0x80)) { (out) = _v; (ok) = true; break; }     \
+        }                                                               \
+    } while (0)
+
+    {
+        const uint8_t *p   = frame->payload;
+        const uint8_t *end = frame->payload + frame->len;
+
+        while (p < end) {
+            uint64_t tag_val; bool tok;
+            READ_VARINT(p, end, tag_val, tok);
+            if (!tok) break;
+
+            uint32_t fn = (uint32_t)(tag_val >> 3);
+            uint32_t wt = (uint32_t)(tag_val & 0x7);
+
+            if (wt == 2) {                      /* LEN field */
+                uint64_t flen; bool lok;
+                READ_VARINT(p, end, flen, lok);
+                if (!lok || p + flen > end) break;
+
+                if (fn == (uint32_t)meshtastic_FromRadio_packet_tag) {
+                    /* Found MeshPacket — scan it for field 4 (decoded) */
+                    const uint8_t *pp   = p;
+                    const uint8_t *pend = p + flen;
+
+                    while (pp < pend) {
+                        uint64_t t2; bool t2ok;
+                        READ_VARINT(pp, pend, t2, t2ok);
+                        if (!t2ok) break;
+
+                        uint32_t fn2 = (uint32_t)(t2 >> 3);
+                        uint32_t wt2 = (uint32_t)(t2 & 0x7);
+
+                        if (wt2 == 2) {
+                            uint64_t fl2; bool l2ok;
+                            READ_VARINT(pp, pend, fl2, l2ok);
+                            if (!l2ok || pp + fl2 > pend) break;
+
+                            if (fn2 == (uint32_t)meshtastic_MeshPacket_decoded_tag) {
+                                /* Found Data submessage — decode directly */
+                                meshtastic_Data data_msg =
+                                    meshtastic_Data_init_default;
+                                data_msg.payload.funcs.decode = payload_decode_cb;
+                                data_msg.payload.arg          = &decode_ctx;
+
+                                pb_istream_t ds =
+                                    pb_istream_from_buffer(pp, (size_t)fl2);
+                                if (pb_decode(&ds, meshtastic_Data_fields,
+                                              &data_msg)) {
+                                    payload_ok = TRUE;
+                                }
+                                pp = pend;  /* done scanning MeshPacket */
+                            } else {
+                                pp += (size_t)fl2;
+                            }
+                        } else if (wt2 == 0) {
+                            uint64_t dummy; bool dok;
+                            READ_VARINT(pp, pend, dummy, dok);
+                            (void)dummy;
+                            if (!dok) break;
+                        } else if (wt2 == 5) { pp += 4; }
+                        else if (wt2 == 1)   { pp += 8; }
+                        else break;
+                    }
+
+                    p += flen;
+                    break;  /* done scanning FromRadio */
+                } else {
+                    p += flen;
+                }
+            } else if (wt == 0) {
+                uint64_t dummy; bool dok;
+                READ_VARINT(p, end, dummy, dok);
+                (void)dummy;
+                if (!dok) break;
+            } else if (wt == 5) { p += 4; }
+            else if (wt == 1)   { p += 8; }
+            else break;
+        }
+    }
+
+    #undef READ_VARINT
+
+    if (!payload_ok || decode_ctx.len == 0) {
+        g_warning("client: failed to extract payload from response "
+                  "(payload_ok=%d len=%zu)", payload_ok, decode_ctx.len);
+        return;
+    }
+
+    const uint8_t *raw     = payload_buf;
+    size_t         raw_len = decode_ctx.len;
+
+    if (raw_len < 12) {
+        g_warning("client: response chunk too short (%zu bytes)", raw_len);
+        return;
+    }
+
+    uint32_t logical_session_id = 0;
+    uint32_t seq_num            = 0;
+    uint32_t total_chunks       = 0;
+    memcpy(&logical_session_id, raw,     4);
+    memcpy(&seq_num,            raw + 4, 4);
+    memcpy(&total_chunks,       raw + 8, 4);
+
+    const uint8_t *chunk_data = raw + 12;
+    size_t         chunk_len  = raw_len - 12;
+
+    g_debug("client: response chunk %u/%u session=%08x len=%zu",
+            seq_num + 1, total_chunks, logical_session_id, chunk_len);
+
+    /* Key on logical_session_id from payload, not pkt->id */
+    MeshSession *session = mesh_session_get_or_create(
+        ct->sessions, ct->gateway_node_id, logical_session_id);
+
+    if (seq_num == 0 || session->expected_chunks == 0)
+        mesh_session_init_reassembly(session, total_chunks);
+
+    bool complete = mesh_session_record_chunk(
+        session, seq_num, chunk_data, chunk_len);
+
+    ct->frames_recv++;
+
+    if (!complete)
+        return;
+
+    /* All chunks in — push assembled response to the MeshStream pipe */
+    if (session->user_data) {
+        MeshStream *ms = (MeshStream *)session->user_data;
+        mesh_stream_push_data(ms,
+                              session->assembly_buf->data,
+                              session->assembly_buf->len);
+        g_info("client: response complete — pushed %u bytes session=%08x",
+               session->assembly_buf->len, logical_session_id);
+    } else {
+        g_warning("client: session %08x complete but no MeshStream assigned",
+                  logical_session_id);
+    }
+
+    mesh_session_init_reassembly(session, 0);
 }
 
 /* ─────────────────────────────────────────────────────────────
