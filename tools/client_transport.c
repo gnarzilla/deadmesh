@@ -273,13 +273,6 @@ int client_send_fn(const uint8_t *payload, size_t len,
                                                 ^ seq);
     packet.hop_limit                        = 3;
 
-    uint8_t packet_buf[600];
-    pb_ostream_t pstream = pb_ostream_from_buffer(packet_buf, sizeof(packet_buf));
-    if (!pb_encode(&pstream, meshtastic_MeshPacket_fields, &packet)) {
-        g_warning("client: MeshPacket encode failed: %s", PB_GET_ERROR(&pstream));
-        return 0;
-    }
-
     /* ToRadio wrapper */
     meshtastic_ToRadio to_radio = meshtastic_ToRadio_init_default;
     to_radio.which_payload_variant        = meshtastic_ToRadio_packet_tag;
