@@ -735,7 +735,7 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 
 ### Throughput Expectations (estimated)
 
-Based on LoRa LONG_FAST physical layer characteristics and proxy-side measurements. End-to-end measured numbers will replace these estimates as LoRa round-trip testing completes.
+> Based on LoRa LONG_FAST physical layer characteristics and proxy-side measurements. End-to-end measured numbers will replace these estimates as LoRa round-trip testing completes.
 
 **LoRa physical layer** (LONG_FAST preset):
 - Raw bitrate: ~5.5 kbps
