@@ -10,7 +10,7 @@ Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosyst
 
 ## Overview
 
-**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols: HTTP/HTTPS, email, DNS, FTP — as if they had normal connectivity.
+**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols: HTTP/HTTPS, email, DNS, FTP; as if they had normal connectivity. The gateway-side pipeline is proven; client-side reassembly is in final testing.
 
 **What makes this different from other mesh solutions:**
 - Standard protocols work unchanged: browse websites, send email, use apps
@@ -21,11 +21,11 @@ Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosyst
 - Real-time embedded dashboard with live mesh visibility (nodes, SNR, positions, telemetry, chat)
 - Connection pooling + TLS session reuse to minimize airtime
 
-Think of it as giving your Meshtastic network the capabilities of a satellite terminal, running on $30 hardware with zero monthly fees.
+The goal is giving your Meshtastic network the capabilities of a satellite terminal, running on $30 hardware with zero monthly fees.
 
 ## The Bigger Picture
 
-deadmesh is a proxy. But with caching fully built out, it becomes something more interesting: a **content-addressed network that happens to speak HTTP**.
+deadmesh is a proxy today. But the architecture is designed for something more interesting: a **content-addressed network that happens to speak HTTP**.
 
 Once a gateway has seen a piece of content, it costs zero airtime to serve it again, to anyone on the mesh, forever. Wikipedia's entire English text corpus is about 4GB as clean text. That fits on a Raspberry Pi SD card. A fully seeded gateway *is* Wikipedia, not a proxy to it; locally, instantly, with no uplink required. At that point the constraint shifts from bandwidth to curation, which is a much more human-solvable problem. That's what the [mesh librarian](#the-knowledge-appliance--mesh-librarians) model is really about.
 
@@ -42,7 +42,7 @@ deadmesh sits in the middle:
 2. **Internet side**: Speaks every protocol your applications already use
 3. **Bridges transparently**: Fragments outgoing requests, reassembles incoming responses
 
-**Result**: Your mesh network works with everything: email clients, web browsers, update tools, API services. Without modifying a single line of application code.
+**Target result**: Your mesh network works with everything: email clients, web browsers, update tools, API services — without modifying a single line of application code. The gateway proxy pipeline achieves this today; the remaining work is client-side packet delivery over LoRa.e.
 
 The key architectural insight is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, forever, without modification. Every protocol deadmesh adds benefits every application simultaneously.
 
@@ -59,13 +59,13 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 
 ## Features
 
-- **Universal Protocol Support**: HTTP/HTTPS, SMTP/IMAP, SOCKS4/5, WebSocket, FTP. If it runs over TCP/IP, it works
+- **Universal Protocol Support**: HTTP/HTTPS, SMTP/IMAP, SOCKS4/5, WebSocket, FTP; all verified through the proxy, with mesh transport for each protocol as the LoRa path completes end-to-end testing
 - **Transparent TLS Interception**: Inspect and cache HTTPS traffic with HTTP/1.1 ALPN negotiation to minimize mesh bandwidth
 - **Intelligent Fragmentation**: Automatically chunks large requests/responses into ~220-byte Meshtastic packets with unique per-chunk packet IDs — bypasses Meshtastic firmware's (from, id) deduplication that would silently drop all but the first chunk of multi-packet sessions
 - **Serial API Handshake**: Proper `want_config` initialization, auto-discovers node ID, receives full mesh state on startup
 - **Robust Serial Framing**: 0x94/0xC3 length-prefix state machine with sync recovery. If magic bytes are lost mid-stream, re-synchronizes automatically. This is what makes multi-hour uptime boring in the right way
 - **Live Mesh Visibility**: Decodes all Meshtastic packet types (text messages, positions, telemetry, node info, routing)
-- **Store-and-Forward**: Delay-tolerant networking handles intermittent mesh connectivity
+- **Store-and-Forward**: Delay-tolerant networking for intermittent mesh connectivity (framework implemented, full DTN queuing in v1.3)
 - **Connection Pooling**: Reuses upstream connections aggressively with TLS session reuse to reduce LoRa airtime cost
 - **Plugin Extensibility**: Ad blocking, rate limiting, compression, caching, custom protocol handlers
 - **Hardware Flexibility**: USB serial, Bluetooth, or TCP-connected radios. Works on Raspberry Pi, x86 Linux, and WSL2 with USB/IP passthrough
@@ -689,6 +689,8 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 
 ## Real-World Use Cases
 
+> These scenarios illustrate what a complete deadmesh deployment enables. The gateway proxy pipeline supports all of them today; full end-to-end mesh delivery is in final testing
+
 ### Disaster Response Network
 
 **Scenario**: Earthquake destroys cell infrastructure
@@ -731,7 +733,9 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 
 ## Performance
 
-### Throughput Expectations
+### Throughput Expectations (estimated)
+
+Based on LoRa LONG_FAST physical layer characteristics and proxy-side measurements. End-to-end measured numbers will replace these estimates as LoRa round-trip testing completes.
 
 **LoRa physical layer** (LONG_FAST preset):
 - Raw bitrate: ~5.5 kbps
@@ -781,11 +785,11 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 - [x] Node table persisted in `DeadlightContext` accessible to all subsystems
 - [x] SSE push for node table updates (live SSE, not polling)
 - [x] Text message panel: display mesh chat in dashboard
-- [x] SSE stream stability (cross-thread write fix, 6+ hour uptime confirmed)
+- [x] SSE stream stability (cross-thread write fix, 100+ hour uptime confirmed)
 - [x] TCP keepalive + stale connection detection (HUP/ERR pre-check)
 - [x] UTF-8/emoji correct JSON escaping in node names and messages
 - [x] Ghost connection cleanup (Chrome prefetch/prerender connections detected and cleaned within 2s)
-- [x] **Per-chunk unique packet IDs**: defeats Meshtastic firmware (from, id) deduplication that silently dropped all but the first chunk of multi-packet sessions — this is what makes large HTTP responses over LoRa actually complete
+- [x] **Per-chunk unique packet IDs**: defeats Meshtastic firmware (from, id) deduplication that silently dropped all but the first chunk of multi-packet sessions — required for large HTTP responses to survive multi-chunk LoRa transmission
 - [x] 12-byte chunk header (`logical_session_id + seq + total`) decouples session identity from firmware packet routing
 
 ### v1.2 (Next)
@@ -903,4 +907,4 @@ Includes:
 
 ---
 
-**Status**: v1.1 — proxy verified, mesh serial active, 70+ nodes visible on startup, live dashboard with SSE streaming (6h+ uptime confirmed), per-chunk unique packet IDs (firmware dedup defeated), emoji/UTF-8 correct | **Maintained by**: [@gnarzilla](https://github.com/gnarzilla) | [deadlight.boo](https://deadlight.boo)
+**Status**: v1.1 — gateway proxy pipeline verified end-to-end (client → LoRa → gateway → Internet → response → LoRa transmit), client-side reassembly in testing, 70+ mesh nodes visible, live dashboard with SSE streaming, 100+ hour continuous uptime (proxy + passive mesh), per-chunk unique packet IDs (firmware dedup defeated), emoji/UTF-8 correct | **Maintained by**: [@gnarzilla](https://github.com/gnarzilla) | [deadlight.boo](https://deadlight.boo)
