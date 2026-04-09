@@ -59,7 +59,7 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 
 ## Features
 
-- **Universal Protocol Support**: HTTP/HTTPS, SMTP/IMAP, SOCKS4/5, WebSocket, FTP; all verified through the proxy, with mesh transport for each protocol as the LoRa path completes end-to-end testing
+- **Universal Protocol Support**(selectively practical): HTTP/HTTPS, SMTP/IMAP, SOCKS4/5, WebSocket, FTP; all verified through the proxy, with mesh transport for each protocol as the LoRa path completes end-to-end testing
 - **Transparent TLS Interception**: Inspect and cache HTTPS traffic with HTTP/1.1 ALPN negotiation to minimize mesh bandwidth
 - **Intelligent Fragmentation**: Automatically chunks large requests/responses into ~220-byte Meshtastic packets with unique per-chunk packet IDs — bypasses Meshtastic firmware's (from, id) deduplication that would silently drop all but the first chunk of multi-packet sessions
 - **Serial API Handshake**: Proper `want_config` initialization, auto-discovers node ID, receives full mesh state on startup
