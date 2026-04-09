@@ -907,4 +907,4 @@ Includes:
 
 ---
 
-**Status**: v1.1 — gateway proxy pipeline verified end-to-end (client → LoRa → gateway → Internet → response → LoRa transmit), client-side reassembly in testing, 70+ mesh nodes visible, live dashboard with SSE streaming, 100+ hour continuous uptime (proxy + passive mesh), per-chunk unique packet IDs (firmware dedup defeated), emoji/UTF-8 correct | **Maintained by**: [@gnarzilla](https://github.com/gnarzilla) | [deadlight.boo](https://deadlight.boo)
+> **Status**: v1.1 gateway proxy pipeline verified end-to-end (client → LoRa → gateway → Internet → response → LoRa transmit), client-side reassembly in testing, 70+ mesh nodes visible, live dashboard with SSE streaming, 100+ hour continuous uptime (proxy + passive mesh), per-chunk unique packet IDs (firmware dedup defeated), emoji/UTF-8 correct | **Maintained by**: [@gnarzilla](https://github.com/gnarzilla) | [deadlight.boo](https://deadlight.boo)
