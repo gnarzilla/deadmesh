@@ -198,28 +198,25 @@ void deadlight_network_stop(DeadlightContext *context) {
         }
         
         if (context->connections) {
+            g_mutex_lock(&context->network->connection_mutex);
+            
             GHashTableIter iter;
             gpointer key, value;
-            
             g_hash_table_iter_init(&iter, context->connections);
             while (g_hash_table_iter_next(&iter, &key, &value)) {
-                DeadlightConnection *conn = (DeadlightConnection *)value;
-                // Set a flag to interrupt tunneling loops
-                conn->should_stop = TRUE;
+                DeadlightConnection *c = (DeadlightConnection *)value;
+                c->should_stop = TRUE;
             }
-            g_mutex_lock(&context->network->connection_mutex);
+            
             guint count = g_hash_table_size(context->connections);
             g_info("Closing %u active connections...", count);
             
-            // Clear the table - this calls the destructor for each value
-            g_hash_table_remove_all(context->connections);
+            // g_hash_table_destroy calls remove_all internally — don't call both
+            g_hash_table_destroy(context->connections);
+            context->connections = NULL;
             context->active_connections = 0;
             
             g_mutex_unlock(&context->network->connection_mutex);
-            
-            // Now destroy the empty table
-            g_hash_table_destroy(context->connections);
-            context->connections = NULL;
         }
         
         // Log and destroy connection pool
@@ -295,8 +292,6 @@ static gboolean on_incoming_connection(GSocketService *service,
 
     DeadlightConnection *conn = deadlight_connection_new(context, connection, client_str);
 
-    detect_protocol:  
-
     // Call plugin hook for new connection
     if (!deadlight_plugins_call_on_connection_accept(context, conn)) {
         g_info("Connection %lu rejected by plugin", conn->id);
@@ -316,7 +311,7 @@ static gboolean on_incoming_connection(GSocketService *service,
     // Queue for processing
     GError *error = NULL;
     if (!g_thread_pool_push(context->worker_pool, conn, &error)) {
-        g_error("Failed to queue connection: %s", error->message);
+        g_critical("Failed to queue connection: %s", error->message);
         g_error_free(error);
 
         g_mutex_lock(&context->network->connection_mutex);
@@ -443,8 +438,7 @@ static void connection_thread_func(gpointer data, gpointer user_data) {
         }
     }
 
-    /* ── Normal socket path (unchanged below) ───────────────────── */
-    detect_protocol:
+    /* ── Normal socket path  ───────────────────── */
     conn->state = DEADLIGHT_STATE_DETECTING;
 
     GSocket *socket = g_socket_connection_get_socket(conn->client_connection);
@@ -919,7 +913,12 @@ static void cleanup_connection_internal(DeadlightConnection *conn, gboolean remo
             conn->upstream_connection = NULL;
         } else {
             g_debug("Connection %lu: Not pooling: %s:%d (SSL=%d, reason=%s)",
-                conn->id, conn->target_host, conn->target_port, use_ssl, reason);
+                    conn->id, conn->target_host, conn->target_port, use_ssl, reason);
+
+            GIOStream *stream_to_discard = use_ssl
+                ? G_IO_STREAM(conn->upstream_tls)
+                : G_IO_STREAM(conn->upstream_connection);
+            connection_pool_discard(conn->context->conn_pool, stream_to_discard);
         }
     }
     
@@ -1175,10 +1174,6 @@ void deadlight_network_tunnel_socket_connections(GSocketConnection *conn1, GSock
             g_clear_error(&error);
         }
         
-        if (G_IS_POLLABLE_INPUT_STREAM(in1)) {
-            g_pollable_input_stream_create_source(G_POLLABLE_INPUT_STREAM(in1), NULL);
-            // Use main loop integration instead of busy waiting
-        }
     }
     
     // Cleanup sources

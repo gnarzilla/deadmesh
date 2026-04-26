@@ -576,6 +576,7 @@ gboolean        connection_pool_upgrade_to_tls(ConnectionPool *pool, GIOStream *
 void            connection_pool_get_stats(ConnectionPool *pool, guint *idle_count, guint *active_count,
                                           guint64 *total_gets, guint64 *cache_hits, gdouble *hit_rate,
                                           guint64 *evicted, guint64 *failed);
+void connection_pool_discard(ConnectionPool *pool, GIOStream *stream);
 
 /* ═══════════════════════════════════════════════════════════
  * API prototypes — Testing & utilities
