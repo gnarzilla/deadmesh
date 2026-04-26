@@ -367,28 +367,6 @@ meshtastic --set lora.tx_power 30  # Check local regulations
 meshtastic --set lora.hop_limit 3  # Adjust for network size
 ```
 
-## Dashboard
-
-deadmesh ships with a real-time gateway dashboard embedded directly in the binary. No external files, no dependencies, nothing to serve separately.
-
-**Access**: `http://localhost:8081` (configurable via `plugin.stats.web_port`)
-
-![Deadmesh Gateway Log](src/assets/static_gatewaylog.png)
-
-**Features**:
-- Live stats: active links, packets relayed, bytes bridged, mesh node count, gateway uptime
-- Live mesh node table: node ID, name, hops, SNR, battery level, GPS position indicator, last heard age (ticks in real time)
-- Gateway log stream via SSE (Server-Sent Events) — zero polling
-- Tabbed left panel: Mesh Nodes (default) and Proxy Links
-- Green RF terminal aesthetic with antenna favicon in browser tab
-
-Build with dashboard support:
-```bash
-make clean && make UI=1
-```
-
-![Deadmesh Message Log](src/assets/static_messages_tab.png)
-
 ## Usage
 
 ### Basic Configuration
