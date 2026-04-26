@@ -77,7 +77,10 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 
 ## Smart Mesh Routing – `mesh://` mode (Not yet implemented)
 
-The feature that makes deadmesh actually *pleasant* to use on LoRa — and the first step toward the content-addressed mesh network described above.
+<details>
+   <summary>`mesh://` mode</summary>
+
+   The feature that makes deadmesh actually *pleasant* to use on LoRa — and the first step toward the content-addressed mesh network described above.
 
 - Type `mesh://en.wikipedia.org` instead of `http://` to get a clean, ultra-compressed, text-only version (~98% smaller)
 - Clear, helpful denial messages when something is impossible (e.g. "YouTube would take 47 hours and 312% of your daily duty cycle" + instant alternatives)
@@ -96,6 +99,8 @@ This compounds over time:
 Volunteers can accelerate this by loading curated content onto a USB stick and physically walking it to gateways, seeding them with Wikipedia, repair manuals, local maps, survival guides. The network gets smarter every time someone goes for a walk. These are the **mesh librarians**, and it's possibly the most wholesome job in off-grid networking.
 
 At full build-out, a well-seeded gateway holds more reference material than most public libraries, serves it instantly to anyone within LoRa range, and costs nothing to operate beyond solar power and a $30 radio.
+</details>
+
 
 Full details and philosophy → [SMART_MESH_ROUTING.md](docs/SMART_MESH_ROUTING.md)
 
