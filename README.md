@@ -104,6 +104,8 @@ Full details and philosophy → [SMART_MESH_ROUTING.md](docs/SMART_MESH_ROUTING.
 
 ## Getting Started
 
+![CLI compile & build](src/assets/media/cli-boot-4-26-26.gif)
+
 ### Prerequisites
 
 **Software**:
