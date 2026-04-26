@@ -1379,10 +1379,12 @@ gboolean deadlight_network_tunnel_data(DeadlightConnection *conn, GError **error
     }
 
     conn->state = DEADLIGHT_STATE_CLOSING;
+    gchar *c2u = deadlight_format_bytes(conn->bytes_client_to_upstream);
+    gchar *u2c = deadlight_format_bytes(conn->bytes_upstream_to_client);
     g_info("Connection %lu: Tunnel closed (client->upstream: %s, upstream->client: %s)",
-           conn->id,
-           deadlight_format_bytes(conn->bytes_client_to_upstream),
-           deadlight_format_bytes(conn->bytes_upstream_to_client));
+        conn->id, c2u, u2c);
+    g_free(c2u);
+    g_free(u2c);
 
     return TRUE;
 }
