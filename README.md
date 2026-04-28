@@ -1,4 +1,4 @@
-# <img src="https://deadmesh.deadlight.boo/apple-touch-icon.png" width="32" height="32"> deadmesh
+# deadmesh · <img src="https://deadmesh.deadlight.boo/apple-touch-icon.png" width="32" height="32">
 
 **A resilient text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
