@@ -80,7 +80,7 @@ void deadlight_log_handler(const gchar *log_domain, GLogLevelFlags log_level,
         default: break;
     }
 
-    const gchar *domain = log_domain ? log_domain : "deadlight";
+    const gchar *domain = log_domain ? log_domain : "deadmesh";
 
     // 1. Construct Plain String for Web Buffer (No ANSI colors)
     // Format: YYYY-MM-DD HH:MM:SS [LEVEL] domain: message

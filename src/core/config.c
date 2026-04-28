@@ -781,12 +781,17 @@ static void config_update_context_values(DeadlightContext *context) {
     context->ssl_intercept_enabled = deadlight_config_get_bool(context, "ssl", "enabled", TRUE);
 
     // Auth secret
+    g_mutex_lock(&context->config_values_mutex);
     g_free(context->auth_secret);
     context->auth_secret = deadlight_config_get_string(context, "security", "auth_secret", NULL);
-    if (!context->auth_secret || strlen(context->auth_secret) == 0) {
-        g_warning("No auth_secret set in [security] — API auth will reject all requests");
-        g_clear_pointer(&context->auth_secret, g_free);
+    if (context->auth_secret && strlen(context->auth_secret) > 0) {
+        g_info("API auth_secret loaded (%zu chars)", strlen(context->auth_secret));
+    } else {
+        g_warning("No auth_secret configured in [security] — /api/outbound/email will reject all requests");
+        g_free(context->auth_secret);
+        context->auth_secret = NULL;
     }
+    g_mutex_unlock(&context->config_values_mutex);
 
     // Mesh manager — update live fields if mesh is already initialised
     if (context->mesh) {

@@ -40,6 +40,7 @@ DeadlightContext *deadlight_context_new(void) {
     g_mutex_init(&ctx->stats_mutex);
     ctx->pending_sse_events = g_queue_new();
     g_mutex_init(&ctx->pending_sse_mutex);
+    g_mutex_init(&ctx->config_values_mutex);
 
     // Set defaults
     ctx->shutdown_requested = FALSE;
@@ -113,6 +114,7 @@ void deadlight_context_free(DeadlightContext *ctx) {
     g_mutex_unlock(&ctx->pending_sse_mutex);
     g_mutex_clear(&ctx->pending_sse_mutex);
     g_mutex_clear(&ctx->stats_mutex);
+    g_mutex_clear(&ctx->config_values_mutex);
     
     // Free cached strings
     g_free(ctx->listen_address);
@@ -121,6 +123,10 @@ void deadlight_context_free(DeadlightContext *ctx) {
     g_free(ctx->network);
     g_free(ctx->ssl);
     g_free(ctx->plugins);
+
+    g_free(ctx->auth_secret);
+    g_free(ctx->auth_endpoint);
+    g_strfreev(ctx->local_hostnames);
     
     // Free VPN manager
     if (ctx->vpn) {
@@ -130,24 +136,7 @@ void deadlight_context_free(DeadlightContext *ctx) {
     
     // Free config
     if (ctx->config) {
-        if (ctx->config->file_monitor) {
-            g_file_monitor_cancel(ctx->config->file_monitor);
-            g_object_unref(ctx->config->file_monitor);
-        }
-        if (ctx->config->keyfile) {
-            g_key_file_free(ctx->config->keyfile);
-        }
-        if (ctx->config->string_cache) {
-            g_hash_table_destroy(ctx->config->string_cache);
-        }
-        if (ctx->config->int_cache) {
-            g_hash_table_destroy(ctx->config->int_cache);
-        }
-        if (ctx->config->bool_cache) {
-            g_hash_table_destroy(ctx->config->bool_cache);
-        }
-        g_free(ctx->config->config_path);
-        g_free(ctx->config);
+        deadlight_config_free(ctx);
     }
     
     g_free(ctx);

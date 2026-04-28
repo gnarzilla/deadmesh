@@ -309,7 +309,7 @@ struct _DeadlightContext {
 
     gboolean shutdown_requested;
     GMutex   stats_mutex;
-
+    GMutex config_values_mutex;
     gchar  **local_hostnames;    // NULL-terminated array of local hostnames
 
     /* Mesh message ring buffer */
