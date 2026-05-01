@@ -55,7 +55,7 @@ connection_pool_reuse_ssl               = true
 # ─────────────────────────────────────────────────────────────
 [meshtastic]
 enabled             = true
-serial_port         = /dev/ttyACM0
+serial_port         = /dev/ttyUSB0
 baud_rate           = 115200
 mesh_node_id        = 0x00000000     # 0 = auto-detect from device
 channel_psk         =                # empty = default public channel
@@ -91,7 +91,7 @@ builtin_enabled     = true
 # ─────────────────────────────────────────────────────────────
 [plugin.meshtastic]
 enabled             = true
-serial_port         = /dev/ttyACM0   # must match [meshtastic] serial_port
+serial_port         = /dev/ttyUSB0   # must match [meshtastic] serial_port
 channel             = LongFast
 custom_port         = 100            # Meshtastic private portnum for proxy traffic
 

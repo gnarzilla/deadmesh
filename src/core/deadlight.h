@@ -476,6 +476,8 @@ gboolean            deadlight_tls_tunnel_data(DeadlightConnection *conn, GError 
 void                deadlight_connection_free(DeadlightConnection *conn);
 GSocketConnection  *deadlight_network_connect_tcp(DeadlightContext *context, const gchar *host, guint16 port, GError **error);
 void                deadlight_network_tunnel_socket_connections(GSocketConnection *conn1, GSocketConnection *conn2);
+void                deadlight_network_lock_connections(DeadlightContext *ctx);
+void                deadlight_network_unlock_connections(DeadlightContext *ctx);
 
 /* ═══════════════════════════════════════════════════════════
  * API prototypes — Protocols
@@ -585,6 +587,7 @@ void connection_pool_discard(ConnectionPool *pool, GIOStream *stream);
 gboolean     deadlight_test_module(const gchar *module_name);
 const gchar *deadlight_protocol_to_string(DeadlightProtocol protocol);
 gchar       *deadlight_format_bytes(guint64 bytes);
+const gchar *deadlight_state_to_string(DeadlightConnectionState state);
 
 /* SSE push — enqueues an SSE event for delivery on the next api.c timer tick.
  * Safe to call from any thread.                                             */

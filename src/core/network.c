@@ -1079,6 +1079,18 @@ static void cleanup_connection_internal(DeadlightConnection *conn, gboolean remo
     g_free(conn);
 }
 
+void deadlight_network_lock_connections(DeadlightContext *ctx) {
+    if (ctx && ctx->network) {
+        g_mutex_lock(&ctx->network->connection_mutex);
+    }
+}
+
+void deadlight_network_unlock_connections(DeadlightContext *ctx) {
+    if (ctx && ctx->network) {
+        g_mutex_unlock(&ctx->network->connection_mutex);
+    }
+}
+
 GSocketConnection* deadlight_network_connect_tcp(DeadlightContext *context, const gchar *host, guint16 port, GError **error) {
     (void)context;
 
