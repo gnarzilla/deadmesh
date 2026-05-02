@@ -22,3 +22,5 @@ Thumbs.db
 *.out
 *.a
 build/
+
+.git*
