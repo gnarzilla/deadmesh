@@ -519,8 +519,15 @@ gchar *deadlight_config_get_string(DeadlightContext *context, const gchar *secti
     gchar  *val  = g_key_file_get_string(context->config->keyfile, section, key, &err);
     if (err) { g_error_free(err); val = g_strdup(default_value); }
 
+    // Expand ~ in path values before caching so all callers get usable paths
+    gchar *expanded = expand_config_path(val);
+    g_free(val);
+    val = expanded;
+
+    // Cache the expanded value
     g_hash_table_insert(context->config->string_cache, cache_key, g_strdup(val));
     g_mutex_unlock(&context->config->cache_mutex);
+
     return val;
 }
 
