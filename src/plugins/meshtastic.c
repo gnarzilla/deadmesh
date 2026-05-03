@@ -530,34 +530,66 @@ static void meshtastic_cleanup(DeadlightContext *context) {
 /* ─────────────────────────────────────────────────────────────
  * Reader thread
  * ───────────────────────────────────────────────────────────── */
-
+ 
 static gpointer reader_thread_func(gpointer user_data) {
     MeshtasticPlugin *mp = (MeshtasticPlugin *)user_data;
     DeadlightContext *context = mp->context;
-
+ 
     g_info("Meshtastic reader thread started (fd=%d)", mp->serial_fd);
-
+ 
     MeshFrameReader reader;
     mesh_frame_reader_init(&reader);
-
+ 
+    /* Consecutive fatal-error counter — we only exit on repeated hard
+     * failures (fd gone / device removed), not on framing timeouts.
+     * A single timeout resets to zero on the next successful frame.  */
+    int consecutive_errors = 0;
+    const int MAX_CONSECUTIVE_ERRORS = 5;
+ 
     while (mp->running && mp->serial_fd >= 0) {
         MeshFrame frame;
-
+ 
         if (!mesh_frame_read_blocking(mp->serial_fd, &reader, &frame)) {
-            if (mp->running) {
-                g_warning("Meshtastic: serial read failed — fd=%d err=%s",
-                           mp->serial_fd, g_strerror(errno));
+            if (!mp->running) break;   /* clean shutdown */
+ 
+            /* Distinguish timeout/sync-loss from fatal fd error.
+             * errno == 0 after a framing timeout (no syscall failed);
+             * errno is set after a real read() error.                */
+            if (errno != 0) {
+                consecutive_errors++;
+                g_warning("Meshtastic: serial read error %d/%d — fd=%d err=%s",
+                          consecutive_errors, MAX_CONSECUTIVE_ERRORS,
+                          mp->serial_fd, g_strerror(errno));
+                if (consecutive_errors >= MAX_CONSECUTIVE_ERRORS) {
+                    g_warning("Meshtastic: too many consecutive errors, "
+                              "reader thread exiting");
+                    break;
+                }
+                /* Brief pause before retry to avoid tight error loop */
+                g_usleep(500 * 1000);
+            } else {
+                /* Framing timeout / sync loss — reset and keep going.
+                 * The warning from mesh_frame_read_blocking is sufficient;
+                 * we don't need to add another one here.               */
+                g_debug("Meshtastic: framing timeout/sync-loss — resetting "
+                        "and continuing (sync_errors=%lu)",
+                        reader.sync_errors);
             }
-            break;
+ 
+            /* Always reset framing state after any failure */
+            mesh_frame_reader_reset(&reader);
+            continue;   /* ← was: break — this is the critical fix */
         }
-
+ 
+        /* Successful frame — reset error counter and state */
+        consecutive_errors = 0;
         mp->frames_recv++;
         mesh_frame_reader_reset(&reader);
-
+ 
         if (context) {
             handle_incoming_frame(mp, context, &frame);
         }
-
+ 
         if (mp->frames_recv % 100 == 0) {
             guint expired = mesh_session_expire(mp->sessions);
             if (expired > 0) {
@@ -565,9 +597,9 @@ static gpointer reader_thread_func(gpointer user_data) {
             }
         }
     }
-
+ 
     g_info("Meshtastic reader thread exiting "
-           "(frames recv=%lu sync_errors=%lu)",
+           "(frames recv=%" G_GUINT64_FORMAT " sync_errors=%lu)",
            mp->frames_recv, reader.sync_errors);
     return NULL;
 }
@@ -930,9 +962,65 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
             break;
         }
 
-        case meshtastic_FromRadio_config_tag:
-            g_debug("Meshtastic: device config received");
-            break;
+        case meshtastic_FromRadio_config_tag: {
+                    meshtastic_Config *cfg = &from_radio.payload_variant.config;
+                    g_debug("Meshtastic: device config received (which=%d)",
+                            cfg->which_payload_variant);
+        
+                    /* Channel config carries the channel name and role.
+                    * which_payload_variant == meshtastic_Config_lora_tag is LoRa
+                    * config; channel info is in a separate FromRadio variant
+                    * (channel_tag), so this case mainly covers device/position/
+                    * display config. Log it but nothing to extract here.     */
+                    (void)cfg;
+                    break;
+                }
+        
+                case meshtastic_FromRadio_channel_tag: {
+                    meshtastic_Channel *ch = &from_radio.payload_variant.channel;
+        
+                    /* Channel index 0 is the primary channel */
+                    PbStringCtx ch_name_ctx = {0};
+        
+                    /* Re-decode to get the channel name string via callback */
+                    meshtastic_FromRadio ch_radio = meshtastic_FromRadio_init_default;
+                    ch_radio.payload_variant.channel
+                        .settings.name.funcs.decode = string_decode_cb;
+                    ch_radio.payload_variant.channel
+                        .settings.name.arg = &ch_name_ctx;
+        
+                    pb_istream_t ch_stream = pb_istream_from_buffer(
+                        frame->payload, frame->len);
+                    pb_decode(&ch_stream, meshtastic_FromRadio_fields, &ch_radio);
+        
+                    const char *role_str = "Primary";
+                    switch (ch->role) {
+                        case meshtastic_Channel_Role_SECONDARY: role_str = "Secondary"; break;
+                        case meshtastic_Channel_Role_DISABLED:  role_str = "Disabled";  break;
+                        default: break;
+                    }
+        
+                    const char *name = (ch_name_ctx.buf[0] != '\0')
+                        ? ch_name_ctx.buf : "LongFast";
+        
+                    g_info("Meshtastic: channel %d — name='%s' role=%s",
+                        ch->index, name, role_str);
+        
+                    /* Push channel info via SSE so the dashboard can update
+                    * the "LongFast / Primary" label with real data          */
+                    if (ch->role != meshtastic_Channel_Role_DISABLED) {
+                        gchar *name_esc = json_escape_string(name);
+                        gchar *json = g_strdup_printf(
+                            "{\"channel_index\":%d,\"channel_name\":\"%s\","
+                            "\"channel_role\":\"%s\"}",
+                            ch->index, name_esc, role_str);
+                        deadlight_sse_enqueue(context, "channel_info", json);
+                        g_free(json);
+                        g_free(name_esc);
+                    }
+                    break;
+                }
+        
 
         case meshtastic_FromRadio_log_record_tag:
             g_debug("Meshtastic: device log: %s", log_message.buf);
