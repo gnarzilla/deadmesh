@@ -7,7 +7,7 @@ Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosyst
 
 [Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
-![CLI boot](src/assets/media/mesh-cli-boot-4-26-26.gif)
+![Full pipe flowing](https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/webui_5.1.26.gif)
 
 ## Overview
 
@@ -37,7 +37,7 @@ deadmesh sits in the middle:
 
 The key architectural insight is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, forever, without modification. Every protocol deadmesh adds benefits every application simultaneously.
 
-![Live Meshtastic Gateway](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif)
+![CLI boot](src/assets/media/mesh-cli-boot-4-26-26.gif)
 
 ### Critical Scenarios This Enables
 
@@ -64,7 +64,7 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
 - **Live Node Table**: Persistent mesh node database; names, hops, SNR, battery, position, last heard, updated from every packet type
 
-![Live Meshtastic LONGFAST logging](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/longfast-live-log.gif)
+![Live Meshtastic Gateway](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif)
 
 ## Smart Mesh Routing – `mesh://` mode (Not yet implemented)
 
