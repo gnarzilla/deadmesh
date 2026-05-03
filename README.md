@@ -7,6 +7,8 @@ Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosyst
 
 [Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
+![Full pipe flowing](https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/webui_5.1.26.gif)
+
 ![CLI boot](src/assets/media/mesh-cli-boot-4-26-26.gif)
 
 ## Overview
