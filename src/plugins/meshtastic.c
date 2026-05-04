@@ -766,17 +766,16 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
 
                 /* Text messages */
                 if (portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
-                    /* decoded_payload is populated by the second-pass above */
                     gchar *text = (decoded_payload.len > 0)
-                        ? g_strndup((const gchar *)decoded_payload.buf, decoded_payload.len)
+                        ? g_strndup((const gchar *)decoded_payload.buf,
+                                    decoded_payload.len)
                         : g_strdup("");
                     g_info("Meshtastic: TEXT from %08x: [%s] (len=%zu)",
                            pkt->from, text, decoded_payload.len);
-
-                    /* Append to context ring buffer */
+ 
+                    /* Ring buffer — store for /api/messages polling */
                     if (context->message_ring_head >= 0) {
                         g_mutex_lock(&context->message_ring_mutex);
-
                         MeshMessage *slot =
                             &context->message_ring[context->message_ring_head];
                         slot->from_node = pkt->from;
@@ -786,31 +785,33 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                                           : 0;
                         slot->snr       = pkt->rx_snr;
                         g_strlcpy(slot->text, text, sizeof(slot->text));
-
                         context->message_ring_head =
-                            (context->message_ring_head + 1) % MESH_MESSAGE_RING_SIZE;
+                            (context->message_ring_head + 1)
+                            % MESH_MESSAGE_RING_SIZE;
                         if (context->message_ring_count < MESH_MESSAGE_RING_SIZE)
                             context->message_ring_count++;
-
                         g_mutex_unlock(&context->message_ring_mutex);
-
-                        /* SSE push — notify dashboard clients immediately */
-                        {
-                            gchar *text_esc = json_escape_string(text);
-                            gchar *json = g_strdup_printf(
-                                "{\"from\":\"%08x\",\"text\":\"%s\","
-                                "\"ts\":%" G_GINT64_FORMAT ",\"hops\":%u,\"snr\":%.1f}",
-                                pkt->from, text_esc,
-                                (gint64)(g_get_real_time() / G_USEC_PER_SEC),
-                                (pkt->hop_start > pkt->hop_limit)
-                                    ? (unsigned)(pkt->hop_start - pkt->hop_limit) : 0u,
-                                (double)pkt->rx_snr);
-                            deadlight_sse_enqueue(context, "message", json);
-                            g_free(json);
-                            g_free(text_esc);
-                        }
                     }
-
+ 
+                    /* SSE push — unconditional, independent of ring state.
+                     * This is what feeds the live dashboard message panel. */
+                    {
+                        gchar *text_esc = json_escape_string(text);
+                        gchar *json = g_strdup_printf(
+                            "{\"from\":\"%08x\",\"text\":\"%s\","
+                            "\"ts\":%" G_GINT64_FORMAT
+                            ",\"hops\":%u,\"snr\":%.1f}",
+                            pkt->from, text_esc,
+                            (gint64)(g_get_real_time() / G_USEC_PER_SEC),
+                            (pkt->hop_start > pkt->hop_limit)
+                                ? (unsigned)(pkt->hop_start - pkt->hop_limit)
+                                : 0u,
+                            (double)pkt->rx_snr);
+                        deadlight_sse_enqueue(context, "message", json);
+                        g_free(json);
+                        g_free(text_esc);
+                    }
+ 
                     g_free(text);
                 }
 
@@ -1001,13 +1002,13 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                     }
         
                     const char *name = (ch_name_ctx.buf[0] != '\0')
-                        ? ch_name_ctx.buf : "LongFast";
+                        ? ch_name_ctx.buf : "Channel";
         
                     g_info("Meshtastic: channel %d — name='%s' role=%s",
                         ch->index, name, role_str);
         
                     /* Push channel info via SSE so the dashboard can update
-                    * the "LongFast / Primary" label with real data          */
+                    * the "Channel / Primary" label with real data          */
                     if (ch->role != meshtastic_Channel_Role_DISABLED) {
                         gchar *name_esc = json_escape_string(name);
                         gchar *json = g_strdup_printf(

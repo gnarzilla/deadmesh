@@ -1006,6 +1006,20 @@
             }
         });
 
+        // ── Channel info — update label from device ────────────────────
+        eventSource.addEventListener('channel_info', (event) => {
+            try {
+                const ch = JSON.parse(event.data);
+                // Only update from primary channel (index 0)
+                if (ch.channel_index === 0 || ch.channel_role === 'Primary') {
+                    document.getElementById('msg-channel').textContent =
+                        ch.channel_name + ' / ' + ch.channel_role;
+                }
+            } catch (err) {
+                console.error('[SSE] channel_info parse error:', err);
+            }
+        });
+
         eventSource.onopen = () => {
             updateApiStatus('online');
             reconnectAttempts = 0;
