@@ -249,11 +249,12 @@ This makes deadmesh an exit ramp from the carrier model, not just a resilience t
 
    If you see `Configuration validation failed: Cannot read CA cert file` — the path in your config doesn't match where you put the certs. Double-check the absolute path and that `~/.deadlight/ca.crt` exists.
 
-<summary>### macOS (Monterey+)/summary>
+### macOS (Monterey+)
    
 <details>
    
-**macOS 12+ with MacPorts** (Homebrew unsupported):
+<summary>**macOS 12+ with MacPorts** (Homebrew unsupported):/summary>
+   
 ```bash
 # Install deps
 sudo port install pkgconfig glib2 openssl json-glib libmicrohttpd curl-ca-bundle
