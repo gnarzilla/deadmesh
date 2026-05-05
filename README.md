@@ -249,9 +249,36 @@ This makes deadmesh an exit ramp from the carrier model, not just a resilience t
 
    If you see `Configuration validation failed: Cannot read CA cert file` — the path in your config doesn't match where you put the certs. Double-check the absolute path and that `~/.deadlight/ca.crt` exists.
 
-8. **Open the dashboard** at `http://localhost:8081` to monitor gateway activity.
+<summary>### macOS (Monterey+)/summary>
+   
+<details>
+   
+**macOS 12+ with MacPorts** (Homebrew unsupported):
+```bash
+# Install deps
+sudo port install pkgconfig glib2 openssl json-glib libmicrohttpd curl-ca-bundle
 
-9. **Test the proxy**:
+# Build
+make -f Makefile.macports UI=1
+
+# Generate CA
+mkdir -p ~/.deadlight
+openssl genrsa -out ~/.deadlight/ca.key 4096
+openssl req -new -x509 -days 3650 -key ~/.deadlight/ca.key \
+  -out ~/.deadlight/ca.crt -subj "/CN=deadmesh CA"
+
+# Install CA
+sudo security add-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain ~/.deadlight/ca.crt
+
+# Run (tunnel mode - no CA needed for clients)
+./bin/deadmesh -c deadmesh-mac -v
+```
+</details>
+
+9. **Open the dashboard** at `http://localhost:8081` to monitor gateway activity.
+
+10. **Test the proxy**:
    ```bash
    # HTTP
    curl -x http://localhost:8080 http://example.com
