@@ -2008,9 +2008,14 @@ static DeadlightHandlerResult api_handle_stream_endpoint(DeadlightConnection *co
             g_socket_set_keepalive(sock, TRUE);
             int fd  = g_socket_get_fd(sock);
             int val;
+    #ifdef __linux__
             val = 60; setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &val, sizeof(val));
             val = 10; setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val));
             val =  3; setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &val, sizeof(val));
+    #elif defined(__APPLE__)
+            val = 60; setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val));
+            // macOS: TCP_KEEPINTVL/TCP_KEEPCNT not available, use defaults
+    #endif
         }
     }
 

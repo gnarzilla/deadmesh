@@ -1,0 +1,152 @@
+# deadmesh (meshtastic.deadlight) v1.0.0
+# Full configuration for testing with hardware attached
+# https://deadlight.boo | https://meshtastic.deadlight.boo
+
+[core]
+port                = 8080
+bind_address        = 0.0.0.0
+max_connections     = 5000
+connection_timeout  = 30
+buffer_size         = 65536
+log_level           = debug
+log_file            =
+worker_threads      = 8
+
+[ssl]
+enabled             = false
+ca_cert_file        = /Users/gnarzilla/.deadlight/ca.crt
+ca_key_file         = /Users/gnarzilla/.deadlight/ca.key
+server_cert_file    = /Users/gnarzilla/.deadlight/server.crt
+server_key_file     = /Users/gnarzilla/.deadlight/server.key
+ca_bundle           = /etc/ssl/certs/ca-bundle.crt
+ssl.ca_bundle = /opt/local/share/curl/curl-ca-bundle.pem
+cert_cache_dir      = /tmp/deadmesh_certs
+cert_cache_size     = 1000
+cert_validity_days  = 30
+cipher_suites       = HIGH:!aNULL:!MD5
+protocols           = TLSv1.2,TLSv1.3
+
+[protocols]
+http_enabled                = true
+https_enabled               = true
+socks4_enabled              = true
+socks5_enabled              = true
+connect_enabled             = true
+imap_enabled                = true
+imaps_enabled               = true
+smtp_enabled                = true
+protocol_detection_timeout  = 5
+
+[network]
+# Generous timeouts — mesh paths are slow
+upstream_timeout                        = 300
+keepalive_timeout                       = 1200
+dns_timeout                             = 5
+dns_servers                             =
+ipv6_enabled                            = true
+tcp_nodelay                             = true
+tcp_keepalive                           = true
+connection_pool_size                    = 25
+connection_pool_timeout                 = 600
+connection_pool_max_total               = 1500
+connection_pool_eviction_policy         = lru
+connection_pool_health_check_interval   = 60
+connection_pool_reuse_ssl               = true
+
+# ─────────────────────────────────────────────────────────────
+# Meshtastic transport (core layer)
+# Read by deadlight_mesh_init() — distinct from [plugin.meshtastic]
+# ─────────────────────────────────────────────────────────────
+[meshtastic]
+enabled             = true
+serial_port         = /dev/ttyUSB0
+baud_rate           = 115200
+mesh_node_id        = 0x00000000     # 0 = auto-detect from device
+channel_psk         =                # empty = default public channel
+fragment_size       = 220            # max safe Meshtastic payload (bytes)
+ack_timeout         = 30000          # 30s — generous for multi-hop
+max_retries         = 3
+hop_limit           = 3
+gateway_mode        = true           # announce as Internet gateway on mesh
+announce_interval   = 300            # seconds between gateway announcements
+
+# ─────────────────────────────────────────────────────────────
+# VPN gateway — requires root / CAP_NET_ADMIN
+# Set enabled=false if not running as root
+# ─────────────────────────────────────────────────────────────
+[vpn]
+enabled             = false          # flip to true when running sudo
+tun_device          = tun0
+gateway_ip          = 10.8.0.1
+client_subnet       = 10.8.0.0/24
+netmask             = 255.255.255.0
+dns_servers         = 8.8.8.8,8.8.4.4
+
+[plugins]
+enabled             = true
+plugin_dir          = ./bin/plugins
+autoload            = adblocker,meshtastic,ratelimiter
+builtin_enabled     = true
+
+# ─────────────────────────────────────────────────────────────
+# Plugin: Meshtastic tunnel
+# Read by meshtastic.so — serial config mirrored here for the
+# plugin layer; core [meshtastic] section is the authoritative source
+# ─────────────────────────────────────────────────────────────
+[plugin.meshtastic]
+enabled             = true
+serial_port         = /dev/ttyUSB0   # must match [meshtastic] serial_port
+channel             = LongFast
+custom_port         = 100            # Meshtastic private portnum for proxy traffic
+
+[plugin.adblocker]
+enabled             = true
+blocklist_url       = https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+blocklist_file      = /var/cache/deadmesh/blocklist.txt
+update_interval     = 86400
+custom_rules        =
+
+[plugin.ratelimiter]
+enabled             = true
+priority_high       = smtp,imap,dns
+priority_low        = http_video,http_images
+
+[plugin.logger]
+enabled             = true
+log_requests        = true
+log_responses       = false
+log_format          = combined
+log_file            =                # empty = stdout alongside main log
+max_log_size        = 100MB
+log_rotation        = daily
+
+[plugin.stats]
+enabled             = true
+stats_interval      = 60
+history_size        = 1440
+web_interface       = true
+web_port            = 8081
+
+[plugin.auth]
+enabled             = false
+auth_type           = basic
+auth_file           = /etc/deadmesh/users.txt
+auth_realm          = deadmesh
+require_auth        = false
+
+[cache]
+enabled             = true
+cache_dir           = /tmp/deadmesh_cache
+max_cache_size      = 1GB
+default_ttl         = 3600
+cache_methods       = GET,HEAD
+cache_responses     = 200,301,302,404
+
+[security]
+enable_security_headers = true
+block_private_ips       = false
+allowed_domains         =
+blocked_domains         =
+max_request_size        = 10MB
+max_header_size         = 8KB
+auth_secret             = grosswindowdeadmeshbirthdayshit          # set this to enable /api auth

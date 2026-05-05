@@ -203,8 +203,7 @@ gboolean deadlight_ssl_init(DeadlightContext *context, GError **error) {
         g_free(trust_store_path);
     } else {
         g_warning("No system CA bundle found — upstream TLS verification will "
-                  "fail. Install ca-certificates (or on Termux: "
-                  "'pkg install ca-certificates') and set ssl.ca_bundle in "
+                  "fail. Install ca-certificates and set ssl.ca_bundle in "
                   "your config.");
     }
 
