@@ -12,22 +12,19 @@ CC := cc
 COMMON_CFLAGS := -std=gnu11 -Wall -Wextra -pedantic -O2 -g
 INCLUDES      := -Isrc -Isrc/core -Isrc/mesh
 
-PKG_CFLAGS := $(shell pkg-config --cflags glib-2.0 gio-2.0 gio-unix-2.0 
-json-glib-1.0 gmodule-2.0)
-PKG_LIBS   := $(shell pkg-config --libs   glib-2.0 gio-2.0 gio-unix-2.0 
-json-glib-1.0 gmodule-2.0)
+PKG_CFLAGS := $(shell pkg-config --cflags glib-2.0 gio-2.0 gio-unix-2.0 json-glib-1.0 gmodule-2.0)
+PKG_LIBS   := $(shell pkg-config --libs   glib-2.0 gio-2.0 gio-unix-2.0 json-glib-1.0 gmodule-2.0)
 
-CFLAGS  := $(COMMON_CFLAGS) $(INCLUDES) $(PKG_CFLAGS) 
--DDEADLIGHT_VERSION=\"$(VERSION)\"
+CFLAGS  := $(COMMON_CFLAGS) $(INCLUDES) $(PKG_CFLAGS) -DDEADLIGHT_VERSION=\"$(VERSION)\"
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
-  LDFLAGS :=
+  LDFLAGS := 
   PLUGIN_LDFLAGS := -shared -undefined dynamic_lookup
 else
   LDFLAGS := -Wl,--as-needed
   PLUGIN_LDFLAGS := -shared
 endif
-LIBS    := -lpthread $(PKG_LIBS)
+LIBS    := -lpthread $(PKG_LIBS) -lssl -lcrypto
 
 #=============================================================================
 # Feature Flags
@@ -60,8 +57,7 @@ ifeq ($(UI),1)
   CFLAGS  += -DENABLE_UI
   CFLAGS  += $(shell pkg-config --cflags libmicrohttpd)
   LIBS    += $(shell pkg-config --libs libmicrohttpd)
-  # Explicit list — assets.c is generated so wildcard won't see it at 
-parse time
+  # Explicit list — assets.c is generated so wildcard won't see it at parse time
   ALL_SRC += src/ui/ui.c src/ui/assets.c
 endif
 
@@ -86,12 +82,9 @@ NANOPB_CFLAGS := -I$(NANOPB_INC) \
                  -Isrc -Isrc/core -Isrc/mesh \
                  -Wno-pedantic
 
-PROTO_FILES := $(filter-out $(PROTO_DIR)/deviceonly.proto,$(wildcard 
-$(PROTO_DIR)/*.proto))
-PROTO_PB_C  := $(patsubst 
-$(PROTO_DIR)/%.proto,$(GEN_DIR)/meshtastic/%.pb.c,$(PROTO_FILES))
-PROTO_PB_H  := $(patsubst 
-$(PROTO_DIR)/%.proto,$(GEN_DIR)/meshtastic/%.pb.h,$(PROTO_FILES))
+PROTO_FILES := $(filter-out $(PROTO_DIR)/deviceonly.proto,$(wildcard $(PROTO_DIR)/*.proto))
+PROTO_PB_C  := $(patsubst $(PROTO_DIR)/%.proto,$(GEN_DIR)/meshtastic/%.pb.c,$(PROTO_FILES))
+PROTO_PB_H  := $(patsubst $(PROTO_DIR)/%.proto,$(GEN_DIR)/meshtastic/%.pb.h,$(PROTO_FILES))
 
 #=============================================================================
 # Top-level Targets
@@ -118,8 +111,7 @@ $(OBJDIR)/%.o: %.c
 
 #=============================================================================
 # UI asset generation
-# assets.c doesn't exist until this runs, so it can't be caught by 
-wildcard.
+# assets.c doesn't exist until this runs, so it can't be caught by wildcard.
 # The generic .o rule handles compilation once the .c exists.
 #=============================================================================
 ifeq ($(UI),1)
@@ -153,26 +145,22 @@ PLUGIN_CFLAGS := $(CFLAGS) -fPIC
 
 plugins: $(PLUGINS)
 
-$(PLUGIN_BINDIR)/adblocker.so: src/plugins/adblocker.c 
-src/plugins/adblocker.h
+$(PLUGIN_BINDIR)/adblocker.so: src/plugins/adblocker.c src/plugins/adblocker.h
 	@echo "Building AdBlocker plugin..."
 	@$(CC) $(PLUGIN_CFLAGS) $(PLUGIN_LDFLAGS) -o $@ $< $(LIBS)
 
-$(PLUGIN_BINDIR)/ratelimiter.so: src/plugins/ratelimiter.c 
-src/plugins/ratelimiter.h
+$(PLUGIN_BINDIR)/ratelimiter.so: src/plugins/ratelimiter.c src/plugins/ratelimiter.h
 	@echo "Building RateLimiter plugin..."
 	@$(CC) $(PLUGIN_CFLAGS) $(PLUGIN_LDFLAGS) -o $@ $< $(LIBS)
 
 $(GEN_DIR)/meshtastic:
 	@mkdir -p $@
 
-$(GEN_DIR)/meshtastic/%.pb.c $(GEN_DIR)/meshtastic/%.pb.h: 
-$(PROTO_DIR)/%.proto | $(GEN_DIR)/meshtastic
+$(GEN_DIR)/meshtastic/%.pb.c $(GEN_DIR)/meshtastic/%.pb.h: $(PROTO_DIR)/%.proto | $(GEN_DIR)/meshtastic
 	@echo "Generating nanopb: $(notdir $<)..."
 	@PROTO_NAME=$$(basename $< .proto); \
 	protoc \
-		
---plugin=protoc-gen-nanopb=$(NANOPB_DIR)/generator/protoc-gen-nanopb \
+		--plugin=protoc-gen-nanopb=$(NANOPB_DIR)/generator/protoc-gen-nanopb \
 		--proto_path=$(PROTO_BASE) \
 		--nanopb_out=$(GEN_DIR) \
 		meshtastic/$$PROTO_NAME.proto
@@ -185,8 +173,7 @@ $(PLUGIN_BINDIR)/meshtastic.so: \
 		$(NANOPB_SRC)
 	@echo "Building Meshtastic plugin..."
 	@$(CC) $(PLUGIN_CFLAGS) $(NANOPB_CFLAGS) $(PLUGIN_LDFLAGS) -o $@ \
-		src/plugins/meshtastic.c $(MESH_SRC) $(PROTO_PB_C) 
-$(NANOPB_SRC) \
+		src/plugins/meshtastic.c $(MESH_SRC) $(PROTO_PB_C) $(NANOPB_SRC) \
 		$(LIBS)
 
 #=============================================================================
@@ -194,8 +181,7 @@ $(NANOPB_SRC) \
 #=============================================================================
 sim: dirs $(SIM)
 
-# Uses $(CFLAGS) — this is the fix; old Makefile hardcoded flags and 
-omitted PKG_CFLAGS
+# Uses $(CFLAGS) — this is the fix; old Makefile hardcoded flags and omitted PKG_CFLAGS
 $(SIM): tools/mesh-sim.c $(MESH_SRC)
 	@echo "Building mesh simulator..."
 	@$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
