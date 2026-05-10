@@ -1,0 +1,257 @@
+#=============================================================================
+# Project
+#=============================================================================
+PROJECT := deadmesh
+VERSION := 1.0.0
+
+#=============================================================================
+# Detect OS
+#=============================================================================
+UNAME := $(shell uname)
+
+#=============================================================================
+# Compiler + Flags
+#=============================================================================
+CC := clang
+
+COMMON_CFLAGS := -std=gnu11 -Wall -Wextra -pedantic -O2 -g \
+                 -Wno-deprecated-declarations \
+                 -Wno-gnu-zero-variadic-macro-arguments
+
+INCLUDES := -Isrc -Isrc/core -Isrc/mesh
+
+# gio-unix-2.0 is Linux-only — omit on Darwin
+ifeq ($(UNAME), Darwin)
+PKG_CFLAGS := $(shell pkg-config --cflags glib-2.0 gio-2.0 json-glib-1.0 gmodule-2.0)
+PKG_LIBS   := $(shell pkg-config --libs   glib-2.0 gio-2.0 json-glib-1.0 gmodule-2.0)
+else
+PKG_CFLAGS := $(shell pkg-config --cflags glib-2.0 gio-2.0 gio-unix-2.0 json-glib-1.0 gmodule-2.0)
+PKG_LIBS   := $(shell pkg-config --libs   glib-2.0 gio-2.0 gio-unix-2.0 json-glib-1.0 gmodule-2.0)
+endif
+
+CFLAGS := $(COMMON_CFLAGS) $(INCLUDES) $(PKG_CFLAGS) \
+          -DDEADLIGHT_VERSION=\"$(VERSION)\"
+
+# -Wl,--as-needed is GNU ld only — Apple ld64 doesn't support it
+ifeq ($(UNAME), Darwin)
+LDFLAGS :=
+LIBS    := -lssl -lcrypto $(PKG_LIBS)
+else
+LDFLAGS := -Wl,--as-needed
+LIBS    := -lssl -lcrypto -lpthread $(PKG_LIBS)
+endif
+
+#=============================================================================
+# Homebrew / MacPorts PKG_CONFIG_PATH hint
+# If pkg-config can't find your libs, run:
+#   export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig"
+# or add it here explicitly:
+#   PKG_CONFIG_PATH := /opt/homebrew/lib/pkgconfig   # Apple Silicon
+#   PKG_CONFIG_PATH := /usr/local/lib/pkgconfig      # Intel Mac
+#=============================================================================
+
+#=============================================================================
+# Feature Flags
+#=============================================================================
+UI ?= 0
+
+#=============================================================================
+# Directories
+#=============================================================================
+OBJDIR        := obj
+BINDIR        := bin
+TOOLSDIR      := tools
+PLUGIN_BINDIR := $(BINDIR)/plugins
+
+#=============================================================================
+# Sources
+# Note: ratelimiter.c is included in the main binary per original Makefile,
+# not only as a plugin .so. Wildcard src/plugins/*.c would double-include
+# other plugin sources that belong only in their .so targets.
+#=============================================================================
+CORE_SRC   := $(wildcard src/core/*.c)
+PROTO_SRC  := $(wildcard src/protocols/*.c)
+MESH_SRC   := $(wildcard src/mesh/*.c)
+VPN_SRC    := $(wildcard src/vpn/*.c)
+PLUGIN_SRC := src/plugins/ratelimiter.c
+
+ALL_SRC := $(CORE_SRC) $(PROTO_SRC) $(MESH_SRC) $(VPN_SRC) $(PLUGIN_SRC)
+
+ifeq ($(UI),1)
+  CFLAGS  += -DENABLE_UI
+  LIBS    += $(shell pkg-config --libs libmicrohttpd 2>/dev/null || \
+             { echo "ERROR: libmicrohttpd not found. brew install libmicrohttpd" >&2; exit 1; })
+  # assets.c is generated — can't be caught by wildcard at parse time
+  ALL_SRC += src/ui/ui.c src/ui/assets.c
+endif
+
+OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(ALL_SRC))
+
+#=============================================================================
+# Nanopb / Meshtastic protobufs
+#=============================================================================
+NANOPB_DIR := src/plugins/nanopb
+NANOPB_INC := src/plugins/include/nanopb
+PROTO_BASE := src/plugins/protobufs
+PROTO_DIR  := $(PROTO_BASE)/meshtastic
+GEN_DIR    := src/plugins/meshtastic
+
+NANOPB_SRC := $(NANOPB_DIR)/pb_common.c \
+              $(NANOPB_DIR)/pb_encode.c \
+              $(NANOPB_DIR)/pb_decode.c
+
+NANOPB_CFLAGS := -I$(NANOPB_INC) \
+                 -I$(GEN_DIR) \
+                 -I$(GEN_DIR)/meshtastic \
+                 -Isrc -Isrc/core -Isrc/mesh \
+                 -Wno-pedantic
+
+PROTO_FILES := $(filter-out $(PROTO_DIR)/deviceonly.proto,$(wildcard $(PROTO_DIR)/*.proto))
+PROTO_PB_C  := $(patsubst $(PROTO_DIR)/%.proto,$(GEN_DIR)/meshtastic/%.pb.c,$(PROTO_FILES))
+PROTO_PB_H  := $(patsubst $(PROTO_DIR)/%.proto,$(GEN_DIR)/meshtastic/%.pb.h,$(PROTO_FILES))
+
+#=============================================================================
+# Shared library extension — .so on Linux, .dylib on macOS
+# Note: Meshtastic loads plugins via dlopen; either extension works as long
+# as you're consistent between build and config. Using .dylib on Darwin to
+# match what clang/ld64 actually produces; update plugin_dir in deadmesh.conf
+# accordingly if you switch.
+#=============================================================================
+ifeq ($(UNAME), Darwin)
+SOEXT   := dylib
+# On Darwin, shared libs use -dynamiclib instead of -shared,
+# and -undefined dynamic_lookup defers symbol resolution to load time
+# (equivalent to Linux's implicit behavior for plugin .so files)
+SOFLAGS := -dynamiclib -undefined dynamic_lookup
+else
+SOEXT   := so
+SOFLAGS := -shared
+endif
+
+#=============================================================================
+# Top-level Targets
+#=============================================================================
+MAIN    := $(BINDIR)/$(PROJECT)
+SIM     := $(TOOLSDIR)/mesh-sim
+CLIENT  := $(BINDIR)/deadmesh-client
+PLUGINS := $(PLUGIN_BINDIR)/adblocker.$(SOEXT) \
+           $(PLUGIN_BINDIR)/ratelimiter.$(SOEXT) \
+           $(PLUGIN_BINDIR)/meshtastic.$(SOEXT)
+
+all: dirs $(MAIN) plugins sim client
+
+dirs:
+	@mkdir -p $(OBJDIR) $(BINDIR) $(PLUGIN_BINDIR) $(TOOLSDIR)
+
+#=============================================================================
+# Generic compile rule
+#=============================================================================
+$(OBJDIR)/%.o: %.c
+	@echo "Compiling $<..."
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+#=============================================================================
+# UI asset generation
+#=============================================================================
+ifeq ($(UI),1)
+UI_ASSETS := src/ui/index.html src/ui/favicon.ico src/ui/favicon.png
+
+src/ui/assets.c: $(UI_ASSETS)
+	@echo "Generating UI assets..."
+	@printf '/* Auto-generated UI assets */\n\n' > $@
+	@for asset in $(UI_ASSETS); do \
+		echo "Embedding $$asset..."; \
+		xxd -i $$asset >> $@; \
+		printf '\n' >> $@; \
+	done
+
+$(OBJDIR)/src/ui/assets.o: src/ui/assets.c
+endif
+
+#=============================================================================
+# Main binary
+#=============================================================================
+$(MAIN): $(OBJ)
+	@echo "Linking $(PROJECT)..."
+	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
+	@echo "Built $(PROJECT) v$(VERSION)"
+
+#=============================================================================
+# Plugins
+# -fPIC is required on Linux; on macOS it's the default for clang but
+# harmless to include explicitly.
+#=============================================================================
+PLUGIN_CFLAGS := $(CFLAGS) -fPIC
+
+plugins: $(PLUGINS)
+
+$(PLUGIN_BINDIR)/adblocker.$(SOEXT): src/plugins/adblocker.c src/plugins/adblocker.h
+	@echo "Building AdBlocker plugin..."
+	@$(CC) $(PLUGIN_CFLAGS) $(SOFLAGS) -o $@ $< $(LIBS)
+
+$(PLUGIN_BINDIR)/ratelimiter.$(SOEXT): src/plugins/ratelimiter.c src/plugins/ratelimiter.h
+	@echo "Building RateLimiter plugin..."
+	@$(CC) $(PLUGIN_CFLAGS) $(SOFLAGS) -o $@ $< $(LIBS)
+
+$(GEN_DIR)/meshtastic:
+	@mkdir -p $@
+
+$(GEN_DIR)/meshtastic/%.pb.c $(GEN_DIR)/meshtastic/%.pb.h: $(PROTO_DIR)/%.proto | $(GEN_DIR)/meshtastic
+	@echo "Generating nanopb: $(notdir $<)..."
+	@PROTO_NAME=$$(basename $< .proto); \
+	protoc \
+		--plugin=protoc-gen-nanopb=$(NANOPB_DIR)/generator/protoc-gen-nanopb \
+		--proto_path=$(PROTO_BASE) \
+		--nanopb_out=$(GEN_DIR) \
+		meshtastic/$$PROTO_NAME.proto
+
+$(PLUGIN_BINDIR)/meshtastic.$(SOEXT): \
+		src/plugins/meshtastic.c \
+		src/plugins/meshtastic.h \
+		$(MESH_SRC) \
+		$(PROTO_PB_C) \
+		$(NANOPB_SRC)
+	@echo "Building Meshtastic plugin..."
+	@$(CC) $(PLUGIN_CFLAGS) $(NANOPB_CFLAGS) $(SOFLAGS) -o $@ \
+		src/plugins/meshtastic.c $(MESH_SRC) $(PROTO_PB_C) $(NANOPB_SRC) \
+		$(LIBS)
+
+#=============================================================================
+# Tools
+#=============================================================================
+sim: dirs $(SIM)
+
+$(SIM): tools/mesh-sim.c $(MESH_SRC)
+	@echo "Building mesh simulator..."
+	@$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+	@echo "Simulator built: $@"
+
+client: dirs $(CLIENT)
+
+$(CLIENT): \
+		tools/client_main.c \
+		tools/client_transport.c \
+		$(MESH_SRC) \
+		$(NANOPB_SRC) \
+		$(PROTO_PB_C)
+	@echo "Building deadmesh-client..."
+	@$(CC) $(CFLAGS) $(NANOPB_CFLAGS) -DCLIENT_TRANSPORT_SERIAL \
+		-o $@ \
+		tools/client_main.c tools/client_transport.c \
+		$(MESH_SRC) $(NANOPB_SRC) $(PROTO_PB_C) \
+		$(LDFLAGS) $(LIBS)
+	@echo "Client built: $@"
+
+#=============================================================================
+# Clean
+#=============================================================================
+clean:
+	@echo "Cleaning..."
+	@rm -rf $(OBJDIR) $(BINDIR) $(SIM)
+	@rm -f src/ui/assets.c
+	@rm -f $(PROTO_PB_C) $(PROTO_PB_H)
+	@rm -rf $(GEN_DIR)
+	@echo "Clean complete"
+
+.PHONY: all clean dirs plugins sim client

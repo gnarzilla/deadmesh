@@ -1,3 +1,19 @@
+# Binaries
+bin/deadmesh
+bin/deadmesh-*
+bin/deadmesh-macos
+bin/plugins/*.so
+bin/plugins/*.dylib
+bin/plugins/*.dSYM
+
+# Debug symbols
+*.dSYM
+obj/
+.DS_Store
+
+# Configs (user-specific)
+deadmesh.conf
+
 # Python
 venv/
 __pycache__/

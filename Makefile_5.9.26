@@ -7,7 +7,7 @@ VERSION := 1.0.0
 #=============================================================================
 # Compiler + Flags (single source of truth)
 #=============================================================================
-CC := gcc
+CC := cc
 
 COMMON_CFLAGS := -std=gnu11 -Wall -Wextra -pedantic -O2 -g
 INCLUDES      := -Isrc -Isrc/core -Isrc/mesh
@@ -16,8 +16,20 @@ PKG_CFLAGS := $(shell pkg-config --cflags glib-2.0 gio-2.0 gio-unix-2.0 json-gli
 PKG_LIBS   := $(shell pkg-config --libs   glib-2.0 gio-2.0 gio-unix-2.0 json-glib-1.0 gmodule-2.0)
 
 CFLAGS  := $(COMMON_CFLAGS) $(INCLUDES) $(PKG_CFLAGS) -DDEADLIGHT_VERSION=\"$(VERSION)\"
+<<<<<<< HEAD
 LDFLAGS := -Wl,--as-needed
 LIBS    := -lssl -lcrypto -lpthread -lresolv $(PKG_LIBS)
+=======
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+  LDFLAGS := 
+  PLUGIN_LDFLAGS := -shared -undefined dynamic_lookup
+else
+  LDFLAGS := -Wl,--as-needed
+  PLUGIN_LDFLAGS := -shared
+endif
+LIBS    := -lpthread $(PKG_LIBS) -lssl -lcrypto
+>>>>>>> refs/remotes/origin/main
 
 #=============================================================================
 # Feature Flags
@@ -39,12 +51,16 @@ CORE_SRC   := $(wildcard src/core/*.c)
 PROTO_SRC  := $(wildcard src/protocols/*.c)
 MESH_SRC   := $(wildcard src/mesh/*.c)
 VPN_SRC    := $(wildcard src/vpn/*.c)
+ifeq ($(UNAME_S),Darwin)
+  VPN_SRC :=
+endif
 PLUGIN_SRC := src/plugins/ratelimiter.c
 
 ALL_SRC := $(CORE_SRC) $(PROTO_SRC) $(MESH_SRC) $(VPN_SRC) $(PLUGIN_SRC)
 
 ifeq ($(UI),1)
   CFLAGS  += -DENABLE_UI
+  CFLAGS  += $(shell pkg-config --cflags libmicrohttpd)
   LIBS    += $(shell pkg-config --libs libmicrohttpd)
   # Explicit list — assets.c is generated so wildcard won't see it at parse time
   ALL_SRC += src/ui/ui.c src/ui/assets.c
@@ -136,11 +152,11 @@ plugins: $(PLUGINS)
 
 $(PLUGIN_BINDIR)/adblocker.so: src/plugins/adblocker.c src/plugins/adblocker.h
 	@echo "Building AdBlocker plugin..."
-	@$(CC) $(PLUGIN_CFLAGS) -shared -o $@ $< $(LIBS)
+	@$(CC) $(PLUGIN_CFLAGS) $(PLUGIN_LDFLAGS) -o $@ $< $(LIBS)
 
 $(PLUGIN_BINDIR)/ratelimiter.so: src/plugins/ratelimiter.c src/plugins/ratelimiter.h
 	@echo "Building RateLimiter plugin..."
-	@$(CC) $(PLUGIN_CFLAGS) -shared -o $@ $< $(LIBS)
+	@$(CC) $(PLUGIN_CFLAGS) $(PLUGIN_LDFLAGS) -o $@ $< $(LIBS)
 
 $(GEN_DIR)/meshtastic:
 	@mkdir -p $@
@@ -161,7 +177,7 @@ $(PLUGIN_BINDIR)/meshtastic.so: \
 		$(PROTO_PB_C) \
 		$(NANOPB_SRC)
 	@echo "Building Meshtastic plugin..."
-	@$(CC) $(PLUGIN_CFLAGS) $(NANOPB_CFLAGS) -shared -o $@ \
+	@$(CC) $(PLUGIN_CFLAGS) $(NANOPB_CFLAGS) $(PLUGIN_LDFLAGS) -o $@ \
 		src/plugins/meshtastic.c $(MESH_SRC) $(PROTO_PB_C) $(NANOPB_SRC) \
 		$(LIBS)
 
