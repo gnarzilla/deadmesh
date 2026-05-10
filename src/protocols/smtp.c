@@ -2,6 +2,15 @@
 #include <string.h>
 #include <json-glib/json-glib.h>
 #include <ctype.h>
+#include <resolv.h>
+#include <arpa/nameser.h>
+#include <netinet/in.h>
+
+// Structure to hold MX record data
+typedef struct {
+    gchar *hostname;
+    gint priority;
+} MXRecord;
 
 static gsize smtp_detect(const guint8 *data, gsize len);
 static DeadlightHandlerResult smtp_handle(DeadlightConnection *conn, GError **error);
@@ -180,6 +189,101 @@ static gchar* read_auth_token(DeadlightContext *context) {
     return token;
 }
 
+static gint compare_mx_records(gconstpointer a, gconstpointer b) {
+    const MXRecord *mx_a = (const MXRecord *)a;
+    const MXRecord *mx_b = (const MXRecord *)b;
+    return mx_a->priority - mx_b->priority;
+}
+
+// Query MX records for a domain and return sorted list
+static GList* smtp_lookup_mx_records(const gchar *domain, GError **error) {
+    GList *mx_records = NULL;
+    
+    // Initialize resolver
+    if (res_init() != 0) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "Failed to initialize DNS resolver");
+        return NULL;
+    }
+    
+    // Query buffer
+    guchar answer[4096];
+    gint answer_len = res_query(domain, ns_c_in, ns_t_mx, answer, sizeof(answer));
+    
+    if (answer_len < 0) {
+        g_warning("SMTP: No MX records found for %s, trying A record fallback", domain);
+        
+        // Fallback: Use the domain itself (try A record)
+        MXRecord *fallback = g_new0(MXRecord, 1);
+        fallback->hostname = g_strdup(domain);
+        fallback->priority = 10;
+        mx_records = g_list_append(mx_records, fallback);
+        
+        return mx_records;
+    }
+    
+    // Parse DNS response
+    ns_msg handle;
+    if (ns_initparse(answer, answer_len, &handle) < 0) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "Failed to parse MX DNS response for %s", domain);
+        return NULL;
+    }
+    
+    // Extract MX records
+    gint mx_count = ns_msg_count(handle, ns_s_an);
+    g_debug("SMTP: Found %d MX records for %s", mx_count, domain);
+    
+    for (int i = 0; i < mx_count; i++) {
+        ns_rr rr;
+        if (ns_parserr(&handle, ns_s_an, i, &rr) < 0) {
+            continue;
+        }
+        
+        if (ns_rr_type(rr) != ns_t_mx) {
+            continue;
+        }
+        
+        // Extract MX data
+        const guchar *rdata = ns_rr_rdata(rr);
+        gint priority = ns_get16(rdata);
+        
+        // Extract hostname
+        gchar hostname[256];
+        if (ns_name_uncompress(answer, answer + answer_len, rdata + 2,
+                              hostname, sizeof(hostname)) < 0) {
+            continue;
+        }
+        
+        MXRecord *mx = g_new0(MXRecord, 1);
+        mx->hostname = g_strdup(hostname);
+        mx->priority = priority;
+        mx_records = g_list_append(mx_records, mx);
+        
+        g_debug("SMTP: MX record: %s (priority %d)", mx->hostname, mx->priority);
+    }
+    
+    if (!mx_records) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "No valid MX records found for %s", domain);
+        return NULL;
+    }
+    
+    // Sort by priority (lowest first)
+    mx_records = g_list_sort(mx_records, compare_mx_records);
+    
+    return mx_records;
+}
+
+static void smtp_free_mx_records(GList *mx_records) {
+    for (GList *l = mx_records; l != NULL; l = l->next) {
+        MXRecord *mx = (MXRecord *)l->data;
+        g_free(mx->hostname);
+        g_free(mx);
+    }
+    g_list_free(mx_records);
+}
+
 // Enhanced SMTP to API function
 static gboolean smtp_send_to_api(DeadlightConnection *conn, DeadlightSMTPData *smtp_data, 
                                        const gchar *api_endpoint, GError **error) {
@@ -328,6 +432,190 @@ static gboolean smtp_send_to_api(DeadlightConnection *conn, DeadlightSMTPData *s
     json_node_unref(root);
     g_object_unref(gen);
     g_object_unref(builder);
+    
+    return success;
+}
+
+gboolean smtp_send_message(const gchar *from, const gchar *to, 
+                          const gchar *subject, const gchar *body,
+                          GError **error) {
+    // Extract domain from recipient email
+    const gchar *at_sign = strchr(to, '@');
+    if (!at_sign) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+                   "Invalid recipient email: %s", to);
+        return FALSE;
+    }
+    const gchar *recipient_domain = at_sign + 1;
+    
+    // Query MX records
+    GError *mx_error = NULL;
+    GList *mx_records = smtp_lookup_mx_records(recipient_domain, &mx_error);
+    
+    if (!mx_records) {
+        g_propagate_error(error, mx_error);
+        return FALSE;
+    }
+    
+    // Try each MX server in order of priority
+    gboolean success = FALSE;
+    GSocketClient *client = NULL;
+    GSocketConnection *connection = NULL;
+    
+    for (GList *l = mx_records; l != NULL && !success; l = l->next) {
+        MXRecord *mx = (MXRecord *)l->data;
+        gint mx_port = 25;
+        
+        g_info("SMTP: Attempting delivery to %s via %s:%d (priority %d)", 
+               to, mx->hostname, mx_port, mx->priority);
+        
+        // Clean up previous attempt
+        if (connection) {
+            g_object_unref(connection);
+            connection = NULL;
+        }
+        if (client) {
+            g_object_unref(client);
+        }
+        
+        // Connect to MX server
+        client = g_socket_client_new();
+        g_socket_client_set_timeout(client, 10);
+        GError *connect_error = NULL;
+        connection = g_socket_client_connect_to_host(
+            client, mx->hostname, mx_port, NULL, &connect_error);
+        
+        if (!connection) {
+            g_warning("SMTP: Failed to connect to %s:%d - %s", 
+                     mx->hostname, mx_port, 
+                     connect_error ? connect_error->message : "unknown error");
+            
+            if (connect_error) {
+                g_error_free(connect_error);
+            }
+            continue; // Try next MX server
+        }
+        
+        // Connection successful, proceed with SMTP handshake
+        GInputStream *in = g_io_stream_get_input_stream(G_IO_STREAM(connection));
+        GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(connection));
+        
+        gchar buffer[1024];
+        gssize bytes_read;
+        
+        // Read greeting (220 ...)
+        bytes_read = g_input_stream_read(in, buffer, sizeof(buffer) - 1, NULL, NULL);
+        if (bytes_read <= 0) {
+            g_warning("SMTP: No greeting from %s", mx->hostname);
+            continue;
+        }
+        buffer[bytes_read] = '\0';
+        g_debug("SMTP: Server greeting: %s", g_strstrip(buffer));
+        
+        // Send EHLO
+        const gchar *our_domain = "deadlight.boo";
+        gchar *ehlo_cmd = g_strdup_printf("EHLO %s\r\n", our_domain);
+        if (!g_output_stream_write_all(out, ehlo_cmd, strlen(ehlo_cmd), NULL, NULL, NULL)) {
+            g_free(ehlo_cmd);
+            continue;
+        }
+        g_free(ehlo_cmd);
+        
+        // Read EHLO response (may be multi-line)
+        bytes_read = g_input_stream_read(in, buffer, sizeof(buffer) - 1, NULL, NULL);
+        if (bytes_read <= 0) continue;
+        buffer[bytes_read] = '\0';
+        g_debug("SMTP: EHLO response: %s", g_strstrip(buffer));
+        
+        // Send MAIL FROM
+        gchar *mail_from = g_strdup_printf("MAIL FROM:<%s>\r\n", from);
+        if (!g_output_stream_write_all(out, mail_from, strlen(mail_from), NULL, NULL, NULL)) {
+            g_free(mail_from);
+            continue;
+        }
+        g_free(mail_from);
+        
+        // Read response
+        bytes_read = g_input_stream_read(in, buffer, sizeof(buffer) - 1, NULL, NULL);
+        if (bytes_read <= 0 || buffer[0] != '2') continue;
+        
+        // Send RCPT TO
+        gchar *rcpt_to = g_strdup_printf("RCPT TO:<%s>\r\n", to);
+        if (!g_output_stream_write_all(out, rcpt_to, strlen(rcpt_to), NULL, NULL, NULL)) {
+            g_free(rcpt_to);
+            continue;
+        }
+        g_free(rcpt_to);
+        
+        // Read response
+        bytes_read = g_input_stream_read(in, buffer, sizeof(buffer) - 1, NULL, NULL);
+        if (bytes_read <= 0 || buffer[0] != '2') continue;
+        
+        // Send DATA
+        const gchar *data_cmd = "DATA\r\n";
+        if (!g_output_stream_write_all(out, data_cmd, strlen(data_cmd), NULL, NULL, NULL)) {
+            continue;
+        }
+        
+        // Read 354 response
+        bytes_read = g_input_stream_read(in, buffer, sizeof(buffer) - 1, NULL, NULL);
+        if (bytes_read <= 0 || buffer[0] != '3') continue;
+        
+        // Build email with proper headers
+        GDateTime *now = g_date_time_new_now_local();
+        gchar *date_str = g_date_time_format(now, "%a, %d %b %Y %H:%M:%S %z");
+
+        GString *message = g_string_new("");
+        g_string_printf(message,
+            "From: %s\r\n"
+            "To: %s\r\n"
+            "Subject: %s\r\n"
+            "Date: %s\r\n"
+            "Message-ID: <%ld.%s>\r\n"
+            "Content-Type: text/plain; charset=UTF-8\r\n"
+            "\r\n"
+            "%s\r\n"
+            ".\r\n",
+            from, to, subject,
+            date_str,
+            g_get_real_time(), from,
+            body);
+
+        g_free(date_str);
+        g_date_time_unref(now);
+        
+        if (!g_output_stream_write_all(out, message->str, message->len, NULL, NULL, NULL)) {
+            g_string_free(message, TRUE);
+            continue;
+        }
+        g_string_free(message, TRUE);
+        
+        // Read final response
+        bytes_read = g_input_stream_read(in, buffer, sizeof(buffer) - 1, NULL, NULL);
+        if (bytes_read <= 0) continue;
+        buffer[bytes_read] = '\0';
+        g_debug("SMTP: Delivery response: %s", g_strstrip(buffer));
+        
+        // Check for success (250 OK)
+        if (buffer[0] == '2') {
+            success = TRUE;
+            g_info("SMTP: Email sent successfully to %s via %s", to, mx->hostname);
+        }
+        
+        // Send QUIT
+        const gchar *quit_cmd = "QUIT\r\n";
+        g_output_stream_write_all(out, quit_cmd, strlen(quit_cmd), NULL, NULL, NULL);
+    }
+    
+    // Cleanup
+    if (connection) g_object_unref(connection);
+    if (client) g_object_unref(client);
+    smtp_free_mx_records(mx_records);
+    
+    if (!success) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "Failed to deliver email to any MX server for %s", recipient_domain);
+    }
     
     return success;
 }

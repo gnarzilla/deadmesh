@@ -30,10 +30,10 @@ static inline GIOStream *g_tls_connection_get_base_io_stream(GTlsConnection *con
  * Version & defaults
  * ═══════════════════════════════════════════════════════════ */
 
-#define DEADMESH_VERSION_MAJOR  1
-#define DEADMESH_VERSION_MINOR  0
-#define DEADMESH_VERSION_PATCH  0
-#define DEADMESH_VERSION_STRING "1.0.0"
+#ifndef DEADMESH_VERSION
+#  define DEADMESH_VERSION "dev"
+#endif
+#define DEADMESH_VERSION_STRING DEADMESH_VERSION
 
 /* Keep proxy.deadlight compat macros so shared code compiles unmodified */
 #define DEADLIGHT_VERSION_MAJOR  DEADMESH_VERSION_MAJOR

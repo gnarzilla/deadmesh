@@ -10,6 +10,10 @@ extern "C" {
 // Register the SMTP protocol handler with the core system
 void deadlight_register_smtp_handler(void);
 
+gboolean smtp_send_message(const gchar *from, const gchar *to, 
+                          const gchar *subject, const gchar *body,
+                          GError **error);
+
 // SMTP-specific data structures
 typedef struct {
     gchar *sender;

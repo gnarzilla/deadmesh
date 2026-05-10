@@ -17,7 +17,7 @@ PKG_LIBS   := $(shell pkg-config --libs   glib-2.0 gio-2.0 gio-unix-2.0 json-gli
 
 CFLAGS  := $(COMMON_CFLAGS) $(INCLUDES) $(PKG_CFLAGS) -DDEADLIGHT_VERSION=\"$(VERSION)\"
 LDFLAGS := -Wl,--as-needed
-LIBS    := -lssl -lcrypto -lpthread $(PKG_LIBS)
+LIBS    := -lssl -lcrypto -lpthread -lresolv $(PKG_LIBS)
 
 #=============================================================================
 # Feature Flags
