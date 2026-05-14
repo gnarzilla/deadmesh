@@ -64,7 +64,7 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
 - **Live Node Table**: Persistent mesh node database; names, hops, SNR, battery, position, last heard, updated from every packet type
 
-![Live Meshtastic Gateway](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif)
+<img src="https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif" width="780" alt="Live Meshtastic Gateway">
 
 ## Smart Mesh Routing – `mesh://` mode (Not yet implemented)
 
