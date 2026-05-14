@@ -111,7 +111,7 @@ This makes deadmesh an exit ramp from the carrier model, not just a resilience t
 
 ## Getting Started
 
-![CLI compile & build](src/assets/media/cli-boot-4-26-26.gif)
+<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/cli-boot-4-26-26.gif" width="780" alt="CLI compile & build">
 
 ### Prerequisites
 
