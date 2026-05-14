@@ -1,11 +1,11 @@
 # deadmesh
 <img src="https://deadmesh.boo/apple-touch-icon.png" width="32" height="32">
 
+[Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
+
 **A resilient text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
 Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on low-bandwidth, high-latency, and intermittently connected networks.
-
-[Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
 <img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/mesh-cli-boot-4-26-26.gif" width="780" alt="CLI boot">
 
@@ -823,7 +823,7 @@ tools/mesh-sim               # Mesh network simulator
 
 ## Contributing
 
-deadmesh is a specialized component of the [Deadlight ecosystem](https://deadlight.boo), built on [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight). Contributions welcome:
+deadmesh is a specialized component of the [Deadlight ecosystem](https://deadlight.boo), built on [deadlight-proxy](https://github.com/gnarzilla/deadlight-proxy). Contributions welcome:
 
 - **Protocol optimizations**: Improve mesh efficiency
 - **Hardware testing**: Validate on different radio platforms
@@ -847,13 +847,13 @@ deadmesh is one layer of a modular stack:
 
 | Project | Lang | Role |
 |---|---|---|
-| [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) | C | SMTP/SOCKS/HTTP/VPN proxy foundation |
+| [deadlight-proxy](https://github.com/gnarzilla/deadlight-proxy) | C | SMTP/SOCKS/HTTP/VPN proxy foundation |
 | **deadmesh** (this) | C | LoRa-to-Internet mesh gateway |
 | [blog.deadlight](https://deadlight.boo) | JS | <10KB pages, email posting, edge-first |
 | [vault.deadlight](https://github.com/gnarzilla/vault.deadlight) | C | Offline credential store, proxy integration |
 | [deadlight-bootstrap](https://v1.deadlight.boo) | JS | Cloudflare Workers + D1 framework |
 
-Each component works standalone but the stack is designed to thrive together — blog.deadlight posting over deadmesh via proxy.deadlight with vault.deadlight managing credentials, all running on solar-powered hardware in a field somewhere.
+Each component works standalone but the stack is designed to thrive together — blog.deadlight posting over deadmesh via deadlight-proxy with vault.deadlight managing credentials, all running on solar-powered hardware in a field somewhere.
 
 ## Legal & Safety
 
