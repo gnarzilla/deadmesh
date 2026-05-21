@@ -1,17 +1,17 @@
 # deadmesh
 <img src="https://deadmesh.boo/apple-touch-icon.png" width="32" height="32">
 
+[Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
+
 **A resilient text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
 Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on low-bandwidth, high-latency, and intermittently connected networks.
 
-[Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
-
-![Full pipe flowing](https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/webui_5.1.26.gif)
+<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/mesh-cli-boot-4-26-26.gif" width="780" alt="CLI boot">
 
 ## Overview
 
-**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols: HTTP/HTTPS, email, DNS, FTP; as if they had normal connectivity. The gateway-side pipeline is proven; client-side reassembly is in final testing.
+**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [deadlight-proxy](https://github.com/gnarzilla/deadlight-proxy) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols: HTTP/HTTPS, email, DNS, FTP; as if they had normal connectivity. The gateway-side pipeline is proven; client-side reassembly is in final testing.
 
 **What makes this different from other mesh solutions:**
 - Standard protocols work unchanged: browse websites, send email, use apps
@@ -37,7 +37,7 @@ deadmesh sits in the middle:
 
 The key architectural insight is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, forever, without modification. Every protocol deadmesh adds benefits every application simultaneously.
 
-![CLI boot](src/assets/media/mesh-cli-boot-4-26-26.gif)
+<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/webui_5.1.26.gif" width="780" alt="Full pipe flowing">
 
 ### Critical Scenarios This Enables
 
@@ -64,7 +64,7 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
 - **Live Node Table**: Persistent mesh node database; names, hops, SNR, battery, position, last heard, updated from every packet type
 
-![Live Meshtastic Gateway](https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif)
+<img src="https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif" width="780" alt="Live Meshtastic Gateway">
 
 ## Smart Mesh Routing – `mesh://` mode (Not yet implemented)
 
@@ -111,7 +111,7 @@ This makes deadmesh an exit ramp from the carrier model, not just a resilience t
 
 ## Getting Started
 
-![CLI compile & build](src/assets/media/cli-boot-4-26-26.gif)
+<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/cli-boot-4-26-26.gif" width="780" alt="CLI compile & build">
 
 ### Prerequisites
 
@@ -823,7 +823,7 @@ tools/mesh-sim               # Mesh network simulator
 
 ## Contributing
 
-deadmesh is a specialized component of the [Deadlight ecosystem](https://deadlight.boo), built on [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight). Contributions welcome:
+deadmesh is a specialized component of the [Deadlight ecosystem](https://deadlight.boo), built on [deadlight-proxy](https://github.com/gnarzilla/deadlight-proxy). Contributions welcome:
 
 - **Protocol optimizations**: Improve mesh efficiency
 - **Hardware testing**: Validate on different radio platforms
@@ -847,13 +847,13 @@ deadmesh is one layer of a modular stack:
 
 | Project | Lang | Role |
 |---|---|---|
-| [proxy.deadlight](https://github.com/gnarzilla/proxy.deadlight) | C | SMTP/SOCKS/HTTP/VPN proxy foundation |
+| [deadlight-proxy](https://github.com/gnarzilla/deadlight-proxy) | C | SMTP/SOCKS/HTTP/VPN proxy foundation |
 | **deadmesh** (this) | C | LoRa-to-Internet mesh gateway |
 | [blog.deadlight](https://deadlight.boo) | JS | <10KB pages, email posting, edge-first |
 | [vault.deadlight](https://github.com/gnarzilla/vault.deadlight) | C | Offline credential store, proxy integration |
 | [deadlight-bootstrap](https://v1.deadlight.boo) | JS | Cloudflare Workers + D1 framework |
 
-Each component works standalone but the stack is designed to thrive together — blog.deadlight posting over deadmesh via proxy.deadlight with vault.deadlight managing credentials, all running on solar-powered hardware in a field somewhere.
+Each component works standalone but the stack is designed to thrive together — blog.deadlight posting over deadmesh via deadlight-proxy with vault.deadlight managing credentials, all running on solar-powered hardware in a field somewhere.
 
 ## Legal & Safety
 
