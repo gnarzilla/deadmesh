@@ -24,6 +24,14 @@ typedef struct {
     GSocketService *data_listener;  // For active mode
     guint16 proxy_data_port;        // Port we listen on for data
     GThread *data_tunnel_thread;
+    // New fields for HTTP-wrapped FTP streaming
+    gboolean http_wrapped;
+    gboolean headers_sent;
+    GString *http_response_headers;
+    GSocketConnection *http_data_conn;
+    GSocketConnection *http_ctrl_conn;
+    gboolean data_transfer_done;
+    gboolean control_waits_226;
 } FTPProtocolData;
 
 typedef struct {
@@ -42,6 +50,11 @@ static gboolean handle_data_connection(DeadlightConnection *conn, const gchar *c
 static gboolean parse_ftp_target(DeadlightConnection *conn, gchar **host, guint16 *port);
 static gboolean on_data_connection_incoming(GSocketService *service, GSocketConnection *client_conn,
                                            GObject *source_object, gpointer user_data);
+static DeadlightHandlerResult handle_http_wrapped_ftp_streaming(DeadlightConnection *conn, GError **error);
+static gboolean parse_ftp_uri(const gchar *uri, gchar **host, guint16 *port, 
+                              gchar **user, gchar **pass, gchar **path);
+static int ftp_send_command(GSocketConnection *conn, const char *cmd, char *response_buf, size_t buf_size);
+static gchar* ftp_read_response_line(GInputStream *in, GError **error);
 
 static const DeadlightProtocolHandler ftp_protocol_handler = {
     .name = "FTP",
@@ -63,7 +76,7 @@ static gsize ftp_detect(const guint8 *data, gsize len) {
         gchar *request = g_strndup((const gchar*)data, MIN(len, 100));
         gboolean is_ftp_url = strstr(request, "ftp://") != NULL;
         g_free(request);
-        if (is_ftp_url) return 0; // Let HTTP handler deal with FTP URLs
+        if (is_ftp_url) return 15; // Higher than HTTP's 8 - take priority
     }
     
     // FTP commands are case-insensitive
@@ -115,6 +128,101 @@ static gsize ftp_detect(const guint8 *data, gsize len) {
     return is_ftp ? 5 : 0;  // Medium priority
 }
 
+// Helper to read a single line from an input stream
+static gchar* ftp_read_response_line(GInputStream *in, GError **error) {
+    GByteArray *line = g_byte_array_new();
+    guint8 ch;
+    gssize n;
+    
+    while (1) {
+        n = g_input_stream_read(in, &ch, 1, NULL, error);
+        if (n != 1) {
+            g_byte_array_free(line, TRUE);
+            return NULL;
+        }
+        if (ch == '\n') {
+            // Remove trailing \r if present
+            if (line->len > 0 && line->data[line->len-1] == '\r')
+                g_byte_array_set_size(line, line->len - 1);
+            g_byte_array_append(line, (guint8*)"", 1); // null terminate
+            gchar *result = g_strdup((gchar*)line->data);
+            g_byte_array_free(line, TRUE);
+            return result;
+        }
+        g_byte_array_append(line, &ch, 1);
+    }
+}
+static int ftp_send_command(GSocketConnection *conn, const char *cmd, char *response_buf, size_t buf_size) {
+    GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(conn));
+    GInputStream *in = g_io_stream_get_input_stream(G_IO_STREAM(conn));
+    gchar *cmd_with_crlf = g_strdup_printf("%s\r\n", cmd);
+    GError *error = NULL;
+    
+    if (!g_output_stream_write_all(out, cmd_with_crlf, strlen(cmd_with_crlf), NULL, NULL, &error)) {
+        g_free(cmd_with_crlf);
+        return -1;
+    }
+    g_free(cmd_with_crlf);
+    
+    // Read response - handle multi-line (indicated by dash after code)
+    GByteArray *full_response = g_byte_array_new();
+    int final_code = 0;
+    
+    while (1) {
+        // Read one line
+        GByteArray *line_buf = g_byte_array_new();
+        guint8 ch;
+        gssize n;
+        
+        while (1) {
+            n = g_input_stream_read(in, &ch, 1, NULL, &error);
+            if (n != 1) {
+                g_byte_array_free(line_buf, TRUE);
+                g_byte_array_free(full_response, TRUE);
+                return -1;
+            }
+            if (ch == '\n') {
+                // Remove trailing \r if present
+                if (line_buf->len > 0 && line_buf->data[line_buf->len-1] == '\r')
+                    g_byte_array_set_size(line_buf, line_buf->len - 1);
+                g_byte_array_append(line_buf, (guint8*)"", 1);
+                break;
+            }
+            g_byte_array_append(line_buf, &ch, 1);
+        }
+        
+        // Append to full response (for logging)
+        if (full_response->len > 0)
+            g_byte_array_append(full_response, (guint8*)"\n", 1);
+        g_byte_array_append(full_response, line_buf->data, line_buf->len);
+        
+        // Parse code from this line
+        char *line = (char*)line_buf->data;
+        int line_code = atoi(line);
+        
+        // Store the first valid code we see
+        if (final_code == 0 && line_code > 0)
+            final_code = line_code;
+        
+        // Check if this is the final line (no dash after the code)
+        // Format: "XXX " (space) indicates last line, "XXX-" indicates continuation
+        gboolean is_last_line = (line[3] == ' ');
+        
+        g_byte_array_free(line_buf, TRUE);
+        
+        if (is_last_line)
+            break;
+    }
+    
+    // Copy full response to output buffer (for error messages)
+    if (response_buf && buf_size > 0) {
+        g_strlcpy(response_buf, (gchar*)full_response->data, buf_size);
+    }
+    
+    g_byte_array_free(full_response, TRUE);
+    return final_code;
+}
+
 static gboolean parse_ftp_target(DeadlightConnection *conn, gchar **host, guint16 *port) {
     DeadlightContext *ctx = conn->context;
     
@@ -164,16 +272,8 @@ static gchar* rewrite_pasv_response(const gchar *original, const gchar *proxy_ip
 }
 
 static gboolean handle_data_connection(DeadlightConnection *conn, const gchar *cmd) {
-    // FTPProtocolData *ftp_data = (FTPProtocolData*)conn->protocol_data;
-    (void)conn; // Suppress unused warning for now
-    
-    // In a full implementation, we would:
-    // 1. Set up our own data listener for PASV mode
-    // 2. Connect to the upstream data server
-    // 3. Proxy the data connection
-    
-    g_debug("Connection %lu: FTP data command: %s", conn->id, cmd);
-    
+    (void)conn;
+    g_debug("FTP data command: %s", cmd);
     return TRUE;
 }
 
@@ -298,7 +398,7 @@ static gboolean ftp_tunnel_with_inspection(DeadlightConnection *conn, GError **e
                                     guint16 proxy_port = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(effective_addr));
 
                                     // 3. Use our function to rewrite the PASV response string
-                                    gchar *rewritten_response = rewrite_pasv_response(buffer, "127.0.0.1", proxy_port); // Using 127.0.0.1 for local testing
+                                    gchar *rewritten_response = rewrite_pasv_response(buffer, "127.0.0.1", proxy_port);
                                     
                                     g_info("Connection %lu: Rewriting PASV response to point to %s:%d", conn->id, "127.0.0.1", proxy_port);
 
@@ -322,7 +422,7 @@ static gboolean ftp_tunnel_with_inspection(DeadlightConnection *conn, GError **e
                             }
                             g_object_unref(bind_addr);
                             g_object_unref(proxy_addr);
-                            g_object_unref(listen_socket); // The listener now owns a ref
+                            g_object_unref(listen_socket);
                         }
 
                         if (*error) {
@@ -332,7 +432,6 @@ static gboolean ftp_tunnel_with_inspection(DeadlightConnection *conn, GError **e
                     }
                     ftp_data->state = FTP_STATE_DATA_PENDING;
                 }
-
                 
                 // Check for successful login
                 if (g_str_has_prefix(buffer, "230 ")) {
@@ -404,10 +503,458 @@ static gboolean on_data_connection_incoming(GSocketService *service, GSocketConn
     g_object_unref(ftp_data->data_listener);
     ftp_data->data_listener = NULL;
 
-    return TRUE; // We handled it.
+    return TRUE;
+}
+
+static gboolean parse_ftp_uri(const gchar *uri, gchar **host, guint16 *port, 
+                              gchar **user, gchar **pass, gchar **path) {
+    gchar *at, *colon, *slash;
+    
+    if (!g_str_has_prefix(uri, "ftp://"))
+        return FALSE;
+    
+    const gchar *start = uri + 6; // after "ftp://"
+    gchar *host_end = NULL;
+    
+    // Default values
+    *host = NULL;
+    *user = NULL;
+    *pass = NULL;
+    *path = NULL;
+    
+    // Check for user:pass@
+    at = strchr(start, '@');
+    if (at) {
+        // userinfo part
+        colon = strchr(start, ':');
+        if (colon && colon < at) {
+            *user = g_strndup(start, colon - start);
+            *pass = g_strndup(colon + 1, at - colon - 1);
+        } else {
+            *user = g_strndup(start, at - start);
+            *pass = g_strdup("");
+        }
+        start = at + 1;
+    }
+    
+    // Find host part end (either ':' for port or '/' for path)
+    slash = strchr(start, '/');
+    colon = strchr(start, ':');
+    
+    if (colon && (!slash || colon < slash)) {
+        // Port specified
+        *host = g_strndup(start, colon - start);
+        *port = (guint16)atoi(colon + 1);
+        host_end = strchr(colon + 1, '/');
+    } else {
+        // No port, default 21
+        *host = g_strndup(start, slash ? slash - start : (gssize)strlen(start));
+        *port = 21;
+        host_end = slash;
+    }
+    
+    // Path (including the leading '/')
+    if (host_end && *host_end == '/') {
+        *path = g_strdup(host_end);
+    } else {
+        *path = g_strdup("/");
+    }
+    
+    // Default user/pass if not provided
+    if (!*user) *user = g_strdup("anonymous");
+    if (!*pass) *pass = g_strdup("anonymous@");
+    
+    return TRUE;
+}
+
+static DeadlightHandlerResult handle_http_wrapped_ftp_streaming(DeadlightConnection *conn, GError **error) {
+    // 1. Parse HTTP request line and extract URI
+    const gchar *data = (const gchar *)conn->client_buffer->data;
+    const gchar *end_of_line = strstr(data, "\r\n");
+    if (!end_of_line) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA, "Malformed HTTP request");
+        return HANDLER_ERROR;
+    }
+    
+    gchar *request_line = g_strndup(data, end_of_line - data);
+    gchar **parts = g_strsplit(request_line, " ", 3);
+    g_free(request_line);
+    
+    if (g_strv_length(parts) < 2 || g_strcmp0(parts[0], "GET") != 0) {
+        g_strfreev(parts);
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA, "Only GET method supported for FTP URLs");
+        return HANDLER_ERROR;
+    }
+    
+    const gchar *uri = parts[1];
+    
+    // 2. Parse FTP URI
+    gchar *ftp_host = NULL, *ftp_user = NULL, *ftp_pass = NULL, *ftp_path = NULL;
+    guint16 ftp_port = 21;
+    if (!parse_ftp_uri(uri, &ftp_host, &ftp_port, &ftp_user, &ftp_pass, &ftp_path)) {
+        g_strfreev(parts);
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA, "Invalid FTP URI");
+        return HANDLER_ERROR;
+    }
+    g_strfreev(parts);
+    
+    g_info("Connection %lu: HTTP-wrapped FTP request to %s:%d, path=%s", 
+           conn->id, ftp_host, ftp_port, ftp_path);
+    
+    // 3. Connect to FTP control port
+    GSocketConnection *ctrl_conn = deadlight_network_connect_tcp(conn->context, ftp_host, ftp_port, error);
+    if (!ctrl_conn) {
+        // Send HTTP error response before returning
+        const char *error_body = "Proxy error: Could not connect to FTP server.\n";
+        char http_error[512];
+        snprintf(http_error, sizeof(http_error),
+            "HTTP/1.1 502 Bad Gateway\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "%s", strlen(error_body), error_body);
+        
+        GOutputStream *client_out = g_io_stream_get_output_stream(G_IO_STREAM(conn->client_connection));
+        g_output_stream_write_all(client_out, http_error, strlen(http_error), NULL, NULL, NULL);
+        return HANDLER_SUCCESS_CLEANUP_NOW;
+    }
+    // 4. Read welcome banner (should be 220, may be multi-line)
+    GInputStream *ctrl_in = g_io_stream_get_input_stream(G_IO_STREAM(ctrl_conn));
+    int welcome_code = 0;
+    gchar *welcome_line = NULL;
+    
+    // Read until we get the final line of the banner
+    while (1) {
+        gchar *line = ftp_read_response_line(ctrl_in, error);
+        if (!line) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED, "Failed to read FTP welcome banner");
+            g_object_unref(ctrl_conn);
+            g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+            return HANDLER_ERROR;
+        }
+        
+        int code = atoi(line);
+        if (welcome_code == 0) welcome_code = code;
+        
+        gboolean is_last_line = (strlen(line) > 3 && line[3] == ' ');
+        
+        // Accumulate but limit size to avoid memory bloat
+        if (welcome_line) {
+            gchar *old = welcome_line;
+            welcome_line = g_strdup_printf("%s\n%.200s", old, line);
+            g_free(old);
+        } else {
+            welcome_line = g_strdup(line);
+        }
+        g_free(line);
+        
+        if (is_last_line)
+            break;
+    }
+    
+    // 5. Authenticate
+    char response[1024];  
+    gchar *cmd;
+    int code;
+    
+    cmd = g_strdup_printf("USER %s", ftp_user);
+    code = ftp_send_command(ctrl_conn, cmd, response, sizeof(response));
+    g_free(cmd);
+    
+    g_info("Connection %lu: USER response: %d - %s", conn->id, code, response);
+    
+    // Handle different FTP server behaviors:
+    // 230 = Logged in successfully (no password needed)
+    // 331 = Password required
+    if (code == 230) {
+        // Already authenticated (common for anonymous FTP)
+        g_info("Connection %lu: FTP anonymous login accepted without password", conn->id);
+    } else if (code == 331) {
+        // Password required
+        cmd = g_strdup_printf("PASS %s", ftp_pass);
+        code = ftp_send_command(ctrl_conn, cmd, response, sizeof(response));
+        g_free(cmd);
+        if (code != 230) {
+            g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED, 
+                       "FTP PASS failed (code %d): %s", code, response);
+            g_object_unref(ctrl_conn);
+            g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+            return HANDLER_ERROR;
+        }
+        g_info("Connection %lu: FTP login successful with password", conn->id);
+    } else if (code == 220) {
+        // Some servers send 220 for "service ready" - we already read welcome banner
+        // This shouldn't happen for USER command, but just in case
+        g_warning("Connection %lu: Unexpected 220 response to USER, retrying...", conn->id);
+        // Small delay and retry? Or just fail.
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED, 
+                   "FTP USER got unexpected 220 response");
+        g_object_unref(ctrl_conn);
+        g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+        return HANDLER_ERROR;
+    } else {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED, 
+                   "FTP USER failed (code %d): %s", code, response);
+        g_object_unref(ctrl_conn);
+        g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+        return HANDLER_ERROR;
+    }
+    
+    // 6. Set binary mode (optional - don't fail if it doesn't work)
+    code = ftp_send_command(ctrl_conn, "TYPE I", response, sizeof(response));
+    if (code != 200) {
+        g_warning("Connection %lu: TYPE I returned %d (continuing anyway): %s", 
+                  conn->id, code, response);
+        // Continue anyway - most servers default to ASCII which is fine for text
+    }
+    
+    // 7. Determine operation: RETR or LIST
+    gboolean is_dir = g_str_has_suffix(ftp_path, "/") || g_strcmp0(ftp_path, "/") == 0;
+    const gchar *ftp_cmd;
+    if (is_dir)
+        ftp_cmd = g_strdup_printf("LIST %s", ftp_path);
+    else
+        ftp_cmd = g_strdup_printf("RETR %s", ftp_path);
+    
+    // 8. Enter passive mode
+    code = ftp_send_command(ctrl_conn, "PASV", response, sizeof(response));
+    if (code != 227) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED, "PASV failed: %s", response);
+        g_object_unref(ctrl_conn);
+        g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+        if (!is_dir) g_free((gchar*)ftp_cmd);
+        return HANDLER_ERROR;
+    }
+    
+    // Parse PASV response to get IP and port
+    gchar *data_host = NULL;
+    guint16 data_port = 0;
+    if (!parse_pasv_response(response, &data_host, &data_port)) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED, "Failed to parse PASV response");
+        g_object_unref(ctrl_conn);
+        g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+        if (!is_dir) g_free((gchar*)ftp_cmd);
+        return HANDLER_ERROR;
+    }
+    
+    // 9. Connect to data port
+    GSocketConnection *data_conn = deadlight_network_connect_tcp(conn->context, data_host, data_port, error);
+    g_free(data_host);
+    if (!data_conn) {
+        g_object_unref(ctrl_conn);
+        g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+        if (!is_dir) g_free((gchar*)ftp_cmd);
+        return HANDLER_ERROR;
+    }
+    
+    // 10. Send RETR or LIST command
+    code = ftp_send_command(ctrl_conn, ftp_cmd, response, sizeof(response));
+    if (code != 150 && code != 125) {
+        // Build HTTP error response - use larger buffer
+        char http_response[2048];  // Increased from 512
+        int http_status = 404;     // Not Found
+        const char *http_status_text = "Not Found";
+        const char *error_body = NULL;
+        char fallback_body[256];
+        
+        // Handle different FTP error codes
+        if (code == 550) {
+            http_status = 404;
+            http_status_text = "Not Found";
+            error_body = "FTP: File not found.\n";
+        } else if (code == 553) {
+            http_status = 403;
+            http_status_text = "Forbidden";
+            error_body = "FTP: Permission denied.\n";
+        } else if (code == 530) {
+            http_status = 401;
+            http_status_text = "Unauthorized";
+            error_body = "FTP: Authentication failed.\n";
+        } else {
+            // Use FTP server's message, but truncate to reasonable length
+            snprintf(fallback_body, sizeof(fallback_body), "FTP error %d: %.200s\n", code, response);
+            error_body = fallback_body;
+        }
+        
+        size_t error_len = strlen(error_body);
+        snprintf(http_response, sizeof(http_response),
+            "HTTP/1.1 %d %s\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "%s", http_status, http_status_text, error_len, error_body);
+        
+        GOutputStream *client_out = g_io_stream_get_output_stream(G_IO_STREAM(conn->client_connection));
+        g_output_stream_write_all(client_out, http_response, strlen(http_response), NULL, NULL, NULL);
+        
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_FAILED, "FTP command %s failed: %s", ftp_cmd, response);
+        g_object_unref(ctrl_conn);
+        g_object_unref(data_conn);
+        g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+        if (!is_dir) g_free((gchar*)ftp_cmd);
+        return HANDLER_SUCCESS_CLEANUP_NOW;
+    }
+    
+    // 11. Setup FTP protocol data for streaming
+    FTPProtocolData *ftp_data = conn->protocol_data;
+    if (!ftp_data) {
+        ftp_data = g_new0(FTPProtocolData, 1);
+        conn->protocol_data = ftp_data;
+    }
+    ftp_data->http_wrapped = TRUE;
+    ftp_data->http_data_conn = data_conn;
+    ftp_data->http_ctrl_conn = ctrl_conn;
+    ftp_data->data_transfer_done = FALSE;
+    ftp_data->control_waits_226 = FALSE;
+    ftp_data->headers_sent = FALSE;
+    
+    // 12. Prepare and send chunked HTTP response headers
+    GString *headers = g_string_new(NULL);
+    g_string_append(headers, "HTTP/1.1 200 OK\r\n");
+    g_string_append(headers, "Content-Type: application/octet-stream\r\n");
+    g_string_append(headers, "Transfer-Encoding: chunked\r\n");
+    g_string_append(headers, "Connection: close\r\n\r\n");
+    ftp_data->http_response_headers = headers;
+    
+    GOutputStream *client_out = g_io_stream_get_output_stream(G_IO_STREAM(conn->client_connection));
+    if (!g_output_stream_write_all(client_out, headers->str, headers->len, NULL, NULL, error)) {
+        g_object_unref(data_conn);
+        g_object_unref(ctrl_conn);
+        g_free(ftp_host); g_free(ftp_user); g_free(ftp_pass); g_free(ftp_path);
+        return HANDLER_ERROR;
+    }
+    ftp_data->headers_sent = TRUE;
+    
+    // 13. Enter streaming loop
+    GSocket *client_sock = g_socket_connection_get_socket(conn->client_connection);
+    GSocket *ctrl_sock = g_socket_connection_get_socket(ctrl_conn);
+    GSocket *data_sock = g_socket_connection_get_socket(data_conn);
+    g_socket_set_blocking(client_sock, FALSE);
+    g_socket_set_blocking(ctrl_sock, FALSE);
+    g_socket_set_blocking(data_sock, FALSE);
+    
+    GPollFD fds[3];
+    fds[0].fd = g_socket_get_fd(client_sock);
+    fds[0].events = 0;
+    fds[1].fd = g_socket_get_fd(ctrl_sock);
+    fds[1].events = G_IO_IN | G_IO_HUP | G_IO_ERR;
+    fds[2].fd = g_socket_get_fd(data_sock);
+    fds[2].events = G_IO_IN | G_IO_HUP | G_IO_ERR;
+    
+    GByteArray *out_buf = g_byte_array_new();
+    gboolean running = TRUE;
+    guint8 data_buf[16384];
+    
+    while (running && !conn->context->shutdown_requested) {
+        gint ready = g_poll(fds, 3, 100);
+        if (ready < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+        
+        // From data socket → client (chunked)
+        if (fds[2].revents & G_IO_IN) {
+            gssize n = g_socket_receive(data_sock, (gchar*)data_buf, sizeof(data_buf), NULL, error);
+            if (n > 0) {
+                // Format as HTTP chunk: "%X\r\n<data>\r\n"
+                gchar chunk_header[32];
+                g_snprintf(chunk_header, sizeof(chunk_header), "%X\r\n", (guint)n);
+                g_byte_array_append(out_buf, (guint8*)chunk_header, strlen(chunk_header));
+                g_byte_array_append(out_buf, data_buf, n);
+                g_byte_array_append(out_buf, (guint8*)"\r\n", 2);
+                fds[0].events = G_IO_OUT;
+            } else if (n == 0) {
+                // Data socket closed - transfer complete
+                ftp_data->data_transfer_done = TRUE;
+                fds[2].events = 0;
+                // Send final zero chunk
+                const gchar *end_chunk = "0\r\n\r\n";
+                g_byte_array_append(out_buf, (guint8*)end_chunk, strlen(end_chunk));
+                fds[0].events = G_IO_OUT;
+            } else if (!(errno == EAGAIN || errno == EWOULDBLOCK)) {
+                running = FALSE;
+            }
+        }
+        
+        // From control socket - look for 226
+        if (fds[1].revents & G_IO_IN) {
+            gssize n = g_socket_receive(ctrl_sock, (gchar*)data_buf, sizeof(data_buf)-1, NULL, error);
+            if (n > 0) {
+                data_buf[n] = '\0';
+                if (strstr((char*)data_buf, "226 ")) {
+                    // Transfer complete on control channel
+                    running = FALSE;
+                }
+            } else if (n == 0) {
+                running = FALSE;
+            }
+        }
+        
+        // Write to client if writable
+        if ((fds[0].revents & G_IO_OUT) && out_buf->len > 0) {
+            gssize written = g_socket_send(client_sock, (const gchar*)out_buf->data, out_buf->len, NULL, error);
+            if (written > 0) {
+                g_byte_array_remove_range(out_buf, 0, written);
+            } else if (written < 0 && !(errno == EAGAIN || errno == EWOULDBLOCK)) {
+                running = FALSE;
+            }
+        }
+        
+        // Clear write flag if buffer empty
+        if (out_buf->len == 0) {
+            fds[0].events = 0;
+        }
+        
+        // Check for errors
+        if ((fds[1].revents | fds[2].revents) & (G_IO_HUP | G_IO_ERR)) {
+            running = FALSE;
+        }
+    }
+
+    // If we didn't send any data (empty directory? no files?), send an empty chunk
+    if (ftp_data->headers_sent && !ftp_data->data_transfer_done) {
+        const gchar *empty_chunk = "0\r\n\r\n";
+        GOutputStream *client_out = g_io_stream_get_output_stream(G_IO_STREAM(conn->client_connection));
+        g_output_stream_write_all(client_out, empty_chunk, strlen(empty_chunk), NULL, NULL, NULL);
+    }
+    
+    // 14. Cleanup
+    g_byte_array_free(out_buf, TRUE);
+    if (ftp_data->http_data_conn) {
+        g_object_unref(ftp_data->http_data_conn);
+        ftp_data->http_data_conn = NULL;
+    }
+    if (ftp_data->http_ctrl_conn) {
+        g_object_unref(ftp_data->http_ctrl_conn);
+        ftp_data->http_ctrl_conn = NULL;
+    }
+    if (ftp_data->http_response_headers) {
+        g_string_free(ftp_data->http_response_headers, TRUE);
+        ftp_data->http_response_headers = NULL;
+    }
+    
+    g_free(ftp_host);
+    g_free(ftp_user);
+    g_free(ftp_pass);
+    g_free(ftp_path);
+    
+    g_info("Connection %lu: HTTP-wrapped FTP streaming complete", conn->id);
+    return HANDLER_SUCCESS_CLEANUP_NOW;
 }
 
 static DeadlightHandlerResult ftp_handle(DeadlightConnection *conn, GError **error) {
+    // Check if this is an HTTP request for an FTP URL
+    if (conn->client_buffer->len >= 4 && memcmp(conn->client_buffer->data, "GET ", 4) == 0) {
+        gchar *sample = g_strndup((const gchar*)conn->client_buffer->data, MIN(conn->client_buffer->len, 100));
+        if (strstr(sample, "ftp://")) {
+            g_free(sample);
+            return handle_http_wrapped_ftp_streaming(conn, error);
+        }
+        g_free(sample);
+    }
+    
     gchar *host = NULL;
     guint16 port = 21;
     
@@ -493,6 +1040,18 @@ static void ftp_cleanup(DeadlightConnection *conn) {
         
         g_free(ftp_data->username);
         g_free(ftp_data->upstream_data_host);
+        g_free(ftp_data->data_host);
+        
+        // Cleanup HTTP-wrapped FTP resources
+        if (ftp_data->http_data_conn) {
+            g_object_unref(ftp_data->http_data_conn);
+        }
+        if (ftp_data->http_ctrl_conn) {
+            g_object_unref(ftp_data->http_ctrl_conn);
+        }
+        if (ftp_data->http_response_headers) {
+            g_string_free(ftp_data->http_response_headers, TRUE);
+        }
         
         // Stop the listener if it's still running
         if (ftp_data->data_listener) {
