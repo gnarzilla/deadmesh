@@ -1,19 +1,7 @@
 /*
  * src/protocols/api.c — deadmesh
  *
- * Merged from proxy.deadlight's api.c improvements:
- *   - SSE_STREAM_MAGIC sentinel for safe protocol_data cast in cleanup
- *   - api_send_error() helper replaces scattered g_strdup_printf error JSON
- *   - api_build_metrics_json() extracted; api_build_dashboard_json() calls it
- *   - api_handle_connections_endpoint() with proper connection-table locking
- *   - Connection table locking in protocol-count loops
- *   - http_get_raw() extracted; reused by fetch_from_workers + discover_federated_instance
- *   - Memory leak fix in api_federation_send (temp vars for g_strdup_printf results)
- *   - api_detect off-by-one fix (len >= 26 for /.well-known/deadlight)
- *   - Deduplicated deadlight_request_parse_headers call in api_handle
- *   - conn->current_request cleanup consolidated at end of api_handle
- *
- * Retained from deadmesh (mesh-specific):
+ * mesh-specific:
  *   - SSEStreamState with socket_conn ref + g_timeout_add_seconds timer ID
  *   - deadlight_sse_drain() mesh event draining in sse_send_update
  *   - TCP keepalive setup on SSE socket
@@ -79,6 +67,8 @@ static DeadlightHandlerResult api_handle_dashboard_endpoint(DeadlightConnection 
 static DeadlightHandlerResult api_handle_stream_endpoint(DeadlightConnection *conn, GError **error);
 static DeadlightHandlerResult api_handle_connections_endpoint(DeadlightConnection *conn, GError **error);
 static DeadlightHandlerResult api_handle_wellknown_deadlight(DeadlightConnection *conn, GError **error);
+static DeadlightHandlerResult api_handle_nodes_endpoint(DeadlightConnection *conn, GError **error);
+static DeadlightHandlerResult api_handle_messages_endpoint(DeadlightConnection *conn, GError **error);
 
 /* Federation */
 static DeadlightHandlerResult api_federation_send(DeadlightConnection *conn, GError **error);
@@ -331,7 +321,7 @@ static DeadlightHandlerResult api_send_json_response(DeadlightConnection *conn,
         "HTTP/1.1 %d %s\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %zu\r\n"
-        "Access-Control-Allow-Origin: https://deadlight.boo\r\n"
+        "Access-Control-Allow-Origin: http://127.0.0.1:8081\r\n"
         "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n"
         "Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization\r\n"
         "Content-Encoding: identity\r\n"
@@ -506,6 +496,184 @@ static gboolean validate_json_fields(JsonObject *obj,
 }
 
 /* =========================================================================
+ * NODES ENDPOINT — /api/nodes
+ * ========================================================================= */
+
+static DeadlightHandlerResult api_handle_nodes_endpoint(DeadlightConnection *conn,
+                                                         GError **error) {
+    DeadlightContext *ctx = conn->context;
+    gint64 now = (gint64)(g_get_real_time() / 1000000);
+
+    JsonBuilder *builder = json_builder_new();
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "nodes");
+    json_builder_begin_array(builder);
+
+    guint total = 0;
+
+    if (ctx->node_table) {
+        g_mutex_lock(&ctx->node_table_mutex);
+
+        GHashTableIter iter;
+        gpointer key, value;
+        g_hash_table_iter_init(&iter, ctx->node_table);
+
+        while (g_hash_table_iter_next(&iter, &key, &value)) {
+            MeshNode *n = (MeshNode *)value;
+            if (!n) continue;
+
+            gint64 age_s = n->last_heard > 0 ? now - n->last_heard : -1;
+
+            /* Format node ID as 8-char hex string */
+            gchar id_str[9];
+            g_snprintf(id_str, sizeof(id_str), "%08x", n->node_id);
+
+            json_builder_begin_object(builder);
+
+            json_builder_set_member_name(builder, "id");
+            json_builder_add_string_value(builder, id_str);
+
+            json_builder_set_member_name(builder, "short");
+            json_builder_add_string_value(builder, n->short_name);
+
+            json_builder_set_member_name(builder, "long");
+            json_builder_add_string_value(builder, n->long_name);
+
+            json_builder_set_member_name(builder, "hops");
+            json_builder_add_int_value(builder, (gint64)n->hops_away);
+
+            json_builder_set_member_name(builder, "snr");
+            json_builder_add_double_value(builder, (gdouble)n->snr);
+
+            json_builder_set_member_name(builder, "battery");
+            json_builder_add_int_value(builder, (gint64)n->battery_level);
+
+            json_builder_set_member_name(builder, "has_position");
+            json_builder_add_boolean_value(builder, n->has_position);
+
+            json_builder_set_member_name(builder, "lat");
+            json_builder_add_double_value(builder, n->has_position ? n->latitude  : 0.0);
+
+            json_builder_set_member_name(builder, "lon");
+            json_builder_add_double_value(builder, n->has_position ? n->longitude : 0.0);
+
+            json_builder_set_member_name(builder, "last_heard");
+            json_builder_add_int_value(builder, n->last_heard);
+
+            json_builder_set_member_name(builder, "age_s");
+            json_builder_add_int_value(builder, age_s);
+
+            json_builder_set_member_name(builder, "is_local");
+            json_builder_add_boolean_value(builder, n->is_local);
+
+            json_builder_end_object(builder);
+            total++;
+        }
+
+        g_mutex_unlock(&ctx->node_table_mutex);
+    }
+
+    json_builder_end_array(builder);
+
+    json_builder_set_member_name(builder, "total");
+    json_builder_add_int_value(builder, (gint64)total);
+
+    json_builder_end_object(builder);
+
+    JsonGenerator *gen = json_generator_new();
+    JsonNode *root = json_builder_get_root(builder);
+    json_generator_set_root(gen, root);
+    gchar *json = json_generator_to_data(gen, NULL);
+
+    DeadlightHandlerResult result =
+        api_send_json_response(conn, 200, "OK", json, error);
+
+    g_free(json);
+    json_node_unref(root);
+    g_object_unref(gen);
+    g_object_unref(builder);
+    return result;
+}
+
+/* =========================================================================
+ * MESSAGES ENDPOINT — /api/messages
+ * ========================================================================= */
+
+static DeadlightHandlerResult api_handle_messages_endpoint(DeadlightConnection *conn,
+                                                            GError **error) {
+    DeadlightContext *ctx = conn->context;
+
+    JsonBuilder *builder = json_builder_new();
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "messages");
+    json_builder_begin_array(builder);
+
+    gint count = 0;
+
+    g_mutex_lock(&ctx->message_ring_mutex);
+
+    if (ctx->message_ring_count > 0) {
+        /* Walk oldest-first: head points to the slot AFTER the oldest entry
+         * when the ring is full, or to index 0 when it's not yet wrapped. */
+        gint start = (ctx->message_ring_count < MESH_MESSAGE_RING_SIZE)
+                     ? 0
+                     : ctx->message_ring_head;
+
+        for (gint i = 0; i < ctx->message_ring_count; i++) {
+            gint idx = (start + i) % MESH_MESSAGE_RING_SIZE;
+            MeshMessage *m = &ctx->message_ring[idx];
+
+            /* Format sender node ID as 8-char hex string */
+            gchar from_str[9];
+            g_snprintf(from_str, sizeof(from_str), "%08x", m->from_node);
+
+            json_builder_begin_object(builder);
+
+            json_builder_set_member_name(builder, "from");
+            json_builder_add_string_value(builder, from_str);
+
+            json_builder_set_member_name(builder, "text");
+            json_builder_add_string_value(builder, m->text);
+
+            json_builder_set_member_name(builder, "ts");
+            json_builder_add_int_value(builder, m->timestamp);
+
+            json_builder_set_member_name(builder, "hops");
+            json_builder_add_int_value(builder, (gint64)m->hops);
+
+            json_builder_set_member_name(builder, "snr");
+            json_builder_add_double_value(builder, (gdouble)m->snr);
+
+            json_builder_end_object(builder);
+            count++;
+        }
+    }
+
+    g_mutex_unlock(&ctx->message_ring_mutex);
+
+    json_builder_end_array(builder);
+
+    json_builder_set_member_name(builder, "total");
+    json_builder_add_int_value(builder, (gint64)count);
+
+    json_builder_end_object(builder);
+
+    JsonGenerator *gen = json_generator_new();
+    JsonNode *root = json_builder_get_root(builder);
+    json_generator_set_root(gen, root);
+    gchar *json = json_generator_to_data(gen, NULL);
+
+    DeadlightHandlerResult result =
+        api_send_json_response(conn, 200, "OK", json, error);
+
+    g_free(json);
+    json_node_unref(root);
+    g_object_unref(gen);
+    g_object_unref(builder);
+    return result;
+}
+
+/* =========================================================================
  * MAIN HANDLER — route table
  * ========================================================================= */
 
@@ -571,7 +739,7 @@ static DeadlightHandlerResult api_handle(DeadlightConnection *conn, GError **err
     if (g_str_equal(request->method, "OPTIONS")) {
         const gchar *cors =
             "HTTP/1.1 200 OK\r\n"
-            "Access-Control-Allow-Origin: https://deadlight.boo\r\n"
+            "Access-Control-Allow-Origin: http://127.0.0.1:8081\r\n"
             "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n"
             "Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization\r\n"
             "Content-Length: 0\r\n"
@@ -628,6 +796,12 @@ static DeadlightHandlerResult api_handle(DeadlightConnection *conn, GError **err
     }
     else if (g_str_has_prefix(uri, "/api/metrics")) {
         result = api_handle_metrics_endpoint(conn, error);
+    }
+    else if (g_str_equal(uri, "/api/nodes")) {
+        result = api_handle_nodes_endpoint(conn, error);
+    }
+    else if (g_str_equal(uri, "/api/messages")) {
+        result = api_handle_messages_endpoint(conn, error);
     }
     else {
         g_debug("API: No route for URI: %s", uri);
