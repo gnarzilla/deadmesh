@@ -7,7 +7,7 @@
 
 Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on low-bandwidth, high-latency, and intermittently connected networks.
 
-<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/deadmesh_ui_v1.1.2.gif" width="540" alt="UI v1.1.2">
+<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/deadmesh_ui_v1.1.2.gif" alt="UI v1.1.2">
 
 ## Overview
 
