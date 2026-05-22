@@ -3,105 +3,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DEAD // MESH</title>
-    
+    <title>D E A D  //  M E S H</title>
+
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --bg: #080b09;
-            --panel: #0f1510;
-            --border: #1a2e1d;
-            --text-main: #d4e8d0;
-            --text-dim: #4d7a52;
-            --accent: #22c55e;
-            --accent-dim: #15803d;
-            --log-bg: #050805;
-            --l-info: #34d399;
-            --l-warn: #fbbf24;
-            --l-err:  #f87171;
-            --l-debug: #374a39;
-            --l-time: #4ade80;
+            --bg:        #080908;
+            --surface:   #0d0f0d;
+            --border:    #192019;
+            --border-hi: #243024;
+            --text:      #c4d4c0;
+            --dim:       #384838;
+            --dim2:      #4e664e;
+            --accent:    #3db870;
+            --accent-lo: #0e2318;
+            --warn:      #d4924a;
+            --err:       #d45050;
+            --ok:        #4ab870;
+            --ts:        #2a5a3a;
+            --l-info:    #3db870;
+            --l-warn:    #d4924a;
+            --l-err:     #d45050;
+            --l-debug:   #2a3a2a;
         }
 
-        * { box-sizing: border-box; }
+        *, *::before, *::after { box-sizing: border-box; }
 
         body {
-            background-color: var(--bg);
-            color: var(--text-main);
+            background: var(--bg);
+            color: var(--text);
             font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 12px;
             margin: 0;
-            padding: 20px;
+            padding: 16px 20px;
             height: 100vh;
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            background-image: repeating-linear-gradient(
-                0deg, transparent, transparent 2px,
-                rgba(34,197,94,0.015) 2px, rgba(34,197,94,0.015) 4px
-            );
+            gap: 14px;
+            overflow: hidden;
         }
 
-        /* ── HEADER ── */
+        /* ── HEADER ──────────────────────────────────────────────── */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-hi);
+            padding-bottom: 12px;
             flex-shrink: 0;
         }
-        h1 { margin: 0; font-size: 20px; letter-spacing: -1px; }
-        .badge { 
-            background: var(--accent); color: #000; 
-            padding: 2px 8px; border-radius: 4px; 
-            font-size: 12px; font-weight: bold;
+
+        .wordmark {
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
 
-        /* ── STATS GRID ── */
-        .grid {
+        .wordmark-title {
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.25em;
+            color: var(--text);
+        }
+
+        .wordmark-title .slash { color: var(--dim2); letter-spacing: 0.1em; }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ── BADGES ──────────────────────────────────────────────── */
+        .badge {
+            font-size: 10px;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            padding: 2px 8px;
+            border: 1px solid var(--border-hi);
+            color: var(--dim2);
+        }
+
+        .badge-stream {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .badge-stream.offline {
+            border-color: var(--err);
+            color: var(--err);
+        }
+
+        .badge-stream.connecting {
+            border-color: var(--warn);
+            color: var(--warn);
+        }
+
+        .pulse {
+            display: inline-block;
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: currentColor;
+            margin-right: 5px;
+            vertical-align: middle;
+            animation: blink 2s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.2; }
+        }
+
+        /* ── SONAR ICON ──────────────────────────────────────────── */
+        .icon-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px; height: 20px;
+        }
+        .icon-wrap::after {
+            content: '';
+            position: absolute;
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            border: 1px solid var(--accent);
+            opacity: 0;
+            animation: sonar 3s ease-out infinite;
+        }
+        @keyframes sonar {
+            0%   { transform: scale(0.4); opacity: 0.5; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+
+        /* ── STAT CARDS ──────────────────────────────────────────── */
+        .stats {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 15px;
+            gap: 10px;
             flex-shrink: 0;
         }
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            padding: 15px; border-radius: 6px;
-            position: relative; overflow: hidden;
-        }
-        .card::before {
-            content: ''; position: absolute;
-            left: 0; top: 0; bottom: 0; width: 2px;
-            background: var(--accent-dim);
-        }
-        .card-label { 
-            color: var(--text-dim); font-size: 11px; 
-            text-transform: uppercase; letter-spacing: 0.05em;
-            margin-bottom: 5px; display: block;
-        }
-        .card-value { font-size: 24px; font-weight: 600; color: var(--accent); }
 
-        /* ── WORKSPACE ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 12px 14px;
+        }
+
+        .card-label {
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            color: var(--dim2);
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .card-value {
+            font-size: 22px;
+            font-weight: 300;
+            color: var(--text);
+            line-height: 1;
+            letter-spacing: -0.5px;
+        }
+
+        .card-value.accent { color: var(--accent); }
+        .card-value.warn   { color: var(--warn); }
+
+        .card-sub {
+            font-size: 9px;
+            color: var(--dim2);
+            margin-top: 5px;
+            letter-spacing: 0.05em;
+        }
+
+        /* ── WORKSPACE ───────────────────────────────────────────── */
         .workspace {
             display: flex;
             flex: 1;
-            gap: 20px;
+            gap: 10px;
             overflow: hidden;
             min-height: 0;
         }
 
-        /* ── LEFT PANEL — TABBED ── */
+        /* ── PANEL BASE ──────────────────────────────────────────── */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 7px 12px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .panel-head-label {
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            color: var(--dim2);
+            text-transform: uppercase;
+        }
+
+        .panel-head-meta {
+            font-size: 9px;
+            color: var(--dim);
+        }
+
+        /* ── LEFT TABBED PANEL ───────────────────────────────────── */
         .left-panel {
             flex: 1;
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 6px;
             display: flex;
             flex-direction: column;
             min-width: 0;
+            border: 1px solid var(--border);
+            background: var(--surface);
             overflow: hidden;
         }
 
@@ -110,102 +237,111 @@
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
         }
+
         .tab-btn {
-            padding: 10px 16px;
+            padding: 7px 14px;
             font-family: inherit;
-            font-size: 11px;
-            font-weight: bold;
-            letter-spacing: 0.08em;
+            font-size: 9px;
+            font-weight: 500;
+            letter-spacing: 0.2em;
             text-transform: uppercase;
-            color: var(--text-dim);
+            color: var(--dim2);
             background: none;
             border: none;
-            border-bottom: 2px solid transparent;
+            border-bottom: 1px solid transparent;
             cursor: pointer;
             transition: color 0.15s, border-color 0.15s;
+            margin-bottom: -1px;
         }
-        .tab-btn:hover { color: var(--text-main); }
+
+        .tab-btn:hover { color: var(--text); }
+
         .tab-btn.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
         }
+
         .tab-live {
             margin-left: auto;
-            padding: 10px 15px;
-            font-size: 10px;
-            color: var(--text-dim);
-            letter-spacing: 0.08em;
+            padding: 7px 12px;
+            font-size: 9px;
+            color: var(--dim);
+            letter-spacing: 0.15em;
             align-self: center;
         }
 
         .tab-pane { display: none; flex: 1; overflow: hidden; flex-direction: column; }
         .tab-pane.active { display: flex; }
 
-        /* ── NODE TABLE ── */
+        /* ── NODE TABLE ──────────────────────────────────────────── */
         .node-table-wrap {
             flex: 1;
             overflow-y: auto;
         }
+
         table.node-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
         }
+
         table.node-table thead {
             position: sticky; top: 0;
-            background: var(--panel);
+            background: var(--surface);
             z-index: 1;
         }
+
         table.node-table th {
-            padding: 7px 10px;
+            padding: 6px 10px;
             text-align: left;
-            color: var(--text-dim);
-            font-weight: normal;
+            color: var(--dim2);
+            font-size: 9px;
+            font-weight: 400;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.1em;
             border-bottom: 1px solid var(--border);
             white-space: nowrap;
         }
+
+        table.node-table th[data-sort] { cursor: pointer; }
+        table.node-table th[data-sort]:hover { color: var(--text); }
+
         table.node-table td {
-            padding: 6px 10px;
-            border-bottom: 1px solid #0d150f;
+            padding: 5px 10px;
+            border-bottom: 1px solid var(--border);
             vertical-align: middle;
             white-space: nowrap;
         }
-        table.node-table tr:hover td { background: #0d1a0f; }
 
-        .node-id    { color: var(--text-dim); font-size: 10px; }
-        .node-local { color: var(--accent); font-weight: bold; }
-        .node-name  { color: var(--text-main); }
-        .node-hops  { color: var(--text-dim); text-align: center; }
+        table.node-table tr:hover td { background: #0f140f; }
+
+        .node-id    { color: var(--dim2); font-size: 10px; }
+        .node-local { color: var(--accent); font-weight: 500; }
+        .node-name  { color: var(--text); }
+        .node-hops  { color: var(--dim2); text-align: center; }
         .node-snr   { color: #6ee7b7; text-align: right; }
-        .node-age   { color: var(--text-dim); text-align: right; }
-        .node-bat   { text-align: center; }
+        .node-age   { color: var(--dim2); text-align: right; }
 
         .bat-bar {
             display: inline-block;
-            width: 36px; height: 8px;
-            background: #1a2e1d;
-            border-radius: 2px;
+            width: 34px; height: 7px;
+            background: var(--border);
             vertical-align: middle;
             overflow: hidden;
             margin-right: 4px;
         }
-        .bat-fill {
-            height: 100%;
-            border-radius: 2px;
-            transition: width 0.3s;
-        }
-        .bat-high   { background: var(--accent); }
-        .bat-med    { background: #fbbf24; }
-        .bat-low    { background: #f87171; }
-        .bat-plug   { background: #60a5fa; }
+
+        .bat-fill { height: 100%; transition: width 0.3s; }
+        .bat-high { background: var(--accent); }
+        .bat-med  { background: var(--warn); }
+        .bat-low  { background: var(--err); }
+        .bat-plug { background: #60a5fa; }
 
         .pos-dot {
             display: inline-block;
-            width: 6px; height: 6px;
+            width: 5px; height: 5px;
             border-radius: 50%;
-            background: var(--accent-dim);
+            background: var(--dim);
             vertical-align: middle;
         }
         .pos-dot.has-pos { background: var(--accent); }
@@ -213,860 +349,937 @@
         .node-empty {
             padding: 30px;
             text-align: center;
-            opacity: 0.4;
-            font-size: 12px;
+            color: var(--dim);
+            font-size: 11px;
         }
 
-        /* ── LINKS PANE ── */
+        /* ── PROXY LINKS PANE ────────────────────────────────────── */
         .conn-list {
             overflow-y: auto;
             flex: 1;
             padding: 0; margin: 0;
             list-style: none;
         }
+
         .conn-row {
-            padding: 8px 15px;
+            padding: 6px 12px;
             border-bottom: 1px solid var(--border);
-            font-size: 12px;
+            font-size: 11px;
             display: grid;
-            grid-template-columns: 40px 1fr 90px;
-            gap: 10px;
+            grid-template-columns: 36px 1fr 80px;
+            gap: 8px;
             align-items: center;
-        }
-        .conn-row:hover { background: #0d1a0f; }
-        .conn-row .proto-tag { color: var(--text-dim); font-size: 10px; }
-        .active-count { color: var(--accent); font-weight: bold; text-align: right; }
-
-        /* ── LOG TERMINAL ── */
-        .terminal-panel {
-            flex: 2;
-            background: var(--log-bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            font-size: 12px;
-            min-width: 0;
-        }
-        .panel-head {
-            padding: 10px 15px;
-            border-bottom: 1px solid var(--border);
-            font-weight: bold;
-            font-size: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: var(--text-dim);
-            letter-spacing: 0.08em;
-            flex-shrink: 0;
-        }
-        .panel-head span:first-child { color: var(--text-main); }
-        .terminal-window {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-            white-space: pre-wrap;
-            font-family: 'Consolas', monospace;
-        }
-        .log-line { 
-            display: block; margin-bottom: 2px; line-height: 1.4;
-            border-left: 2px solid transparent; padding-left: 5px;
-        }
-        .log-line:hover { background: #0a110a; border-left-color: var(--text-dim); }
-        .ts          { color: var(--l-time); opacity: 0.6; margin-right: 10px; }
-        .lvl-INFO    { color: var(--l-info);  font-weight: bold; }
-        .lvl-WARN    { color: var(--l-warn);  font-weight: bold; }
-        .lvl-ERROR   { color: var(--l-err);   font-weight: bold; }
-        .lvl-DEBUG   { color: var(--l-debug); }
-        .msg         { color: var(--text-main); }
-
-        /* ── SCROLLBARS ── */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg); }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
-
-        /* ── STATUS ── */
-        .status-indicator {
-            display: inline-block; width: 8px; height: 8px;
-            border-radius: 50%; margin-right: 6px;
-            animation: pulse 2s infinite;
-        }
-        .status-online     { background: var(--accent); }
-        .status-offline    { background: #ef4444; animation: none; }
-        .status-connecting { background: #fbbf24; }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50%       { opacity: 0.35; }
+            transition: background 0.1s;
         }
 
-        .stream-mode { font-size: 10px; color: var(--text-dim); margin-left: 5px; letter-spacing: 0.05em; }
+        .conn-row:hover { background: #0f140f; }
+        .conn-proto-tag { color: var(--dim2); font-size: 9px; letter-spacing: 0.05em; }
+        .conn-active-count { color: var(--accent); font-weight: 500; text-align: right; font-size: 10px; }
+        .conn-empty {
+            padding: 24px 12px;
+            text-align: center;
+            color: var(--dim);
+            font-size: 11px;
+        }
 
-        /* ── MESSAGE PANEL (right-side chat log) ── */
-        .msg-panel {
-            display: none;
-            flex-direction: column;
-            height: 100%;
-        }
-        .msg-panel.active { display: flex; }
-        .msg-panel-header {
-            padding: 10px 16px 8px;
-            border-bottom: 1px solid var(--border);
-            font-size: 10px;
-            letter-spacing: 0.12em;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .msg-panel-header .msg-channel {
-            color: var(--accent);
-            font-weight: bold;
-        }
-        .msg-panel-header .msg-count {
-            margin-left: auto;
-            opacity: 0.5;
-        }
+        /* ── MESSAGES PANE ───────────────────────────────────────── */
         .msg-scroll {
             flex: 1;
             overflow-y: auto;
-            padding: 12px 0;
+            padding: 6px 0;
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 1px;
         }
+
         .msg-bubble {
-            padding: 8px 16px 10px;
+            padding: 7px 14px 9px;
             border-left: 2px solid transparent;
             transition: background 0.15s;
         }
-        .msg-bubble:hover { background: #0a150b; }
+
+        .msg-bubble:hover { background: #0f140f; }
+
         .msg-bubble.msg-new {
             animation: msgflash 2s ease-out forwards;
             border-left-color: var(--accent);
         }
+
         @keyframes msgflash {
-            0%   { background: rgba(34,197,94,0.10); }
+            0%   { background: rgba(61,184,112,0.08); }
             100% { background: transparent; }
         }
+
         .msg-bubble-header {
             display: flex;
             align-items: baseline;
-            gap: 8px;
-            margin-bottom: 4px;
+            gap: 7px;
+            margin-bottom: 3px;
         }
+
         .msg-sender {
-            font-size: 11px;
-            font-weight: bold;
+            font-size: 10px;
+            font-weight: 500;
             color: var(--accent);
             letter-spacing: 0.04em;
         }
+
         .msg-sender-id {
             font-size: 9px;
-            color: var(--text-dim);
-            opacity: 0.6;
+            color: var(--dim2);
         }
-        .msg-badges {
-            display: flex;
-            gap: 5px;
-            margin-left: 4px;
-        }
+
+        .msg-badges { display: flex; gap: 4px; margin-left: 2px; }
+
         .msg-badge {
             font-size: 9px;
-            padding: 1px 5px;
-            border-radius: 2px;
-            background: rgba(34,197,94,0.08);
-            color: var(--text-dim);
+            padding: 1px 4px;
+            background: var(--accent-lo);
+            color: var(--dim2);
             border: 1px solid var(--border);
+            letter-spacing: 0.04em;
         }
+
         .msg-badge.snr  { color: #6ee7b7; }
         .msg-badge.hops { color: #86efac; }
+
         .msg-ts {
             margin-left: auto;
             font-size: 9px;
-            color: var(--text-dim);
-            opacity: 0.5;
-            white-space: nowrap;
+            color: var(--dim);
         }
+
         .msg-body {
-            font-size: 13px;
-            color: #d4ffd4;
+            font-size: 12px;
+            color: #c8f0c8;
             line-height: 1.5;
             word-break: break-word;
             white-space: pre-wrap;
-            padding-left: 2px;
         }
+
         .msg-empty-state {
             flex: 1;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            opacity: 0.3;
-            gap: 8px;
+            color: var(--dim);
+            font-size: 10px;
+            letter-spacing: 0.15em;
         }
-        .msg-empty-state .empty-icon { font-size: 32px; }
-        .msg-empty-state .empty-text { font-size: 11px; letter-spacing: 0.1em; }
 
-        /* left-panel messages tab — just shows count/redirect hint */
-        .msg-list-wrap { display: none; }
+        /* ── LOG / RIGHT PANEL ───────────────────────────────────── */
+        .log-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            min-width: 0;
+        }
 
-        .icon-wrap {
-            position: relative; display: flex;
-            align-items: center; justify-content: center;
-            width: 24px; height: 24px;
+        .log-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
         }
-        .icon-wrap::after {
-            content: ''; position: absolute;
-            width: 36px; height: 36px; border-radius: 50%;
-            border: 1px solid var(--accent); opacity: 0;
-            animation: sonar 3s ease-out infinite;
+
+        .log-filter-btn {
+            font-family: inherit;
+            font-size: 9px;
+            letter-spacing: 0.15em;
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--dim2);
+            padding: 2px 7px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.1s;
         }
-        @keyframes sonar {
-            0%   { transform: scale(0.4); opacity: 0.6; }
-            100% { transform: scale(1.4); opacity: 0; }
+
+        .log-filter-btn:hover,
+        .log-filter-btn.active     { border-color: var(--accent); color: var(--accent); }
+        .log-filter-btn.active-warn { border-color: var(--warn); color: var(--warn); }
+        .log-filter-btn.active-err  { border-color: var(--err);  color: var(--err);  }
+
+        .log-autoscroll {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 9px;
+            color: var(--dim2);
+            cursor: pointer;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            user-select: none;
         }
+
+        .log-autoscroll input { cursor: pointer; accent-color: var(--accent); }
+
+        .log-errcount {
+            font-size: 9px;
+            color: var(--err);
+            letter-spacing: 0.1em;
+        }
+
+        .log-errcount.zero { display: none; }
+
+        /* ── MSG LOG PANEL (right column, messages tab) ──────────── */
+        .msg-log-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        /* ── TERMINAL ────────────────────────────────────────────── */
+        .terminal {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+            font-size: 11px;
+            line-height: 1.55;
+        }
+
+        .log-line {
+            display: block;
+            padding: 1px 4px;
+            border-left: 2px solid transparent;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-line:hover {
+            background: #0d120d;
+            border-left-color: var(--border-hi);
+        }
+
+        .log-line.hidden { display: none; }
+        .log-line.is-warn { background: #1a0f00; }
+        .log-line.is-err  { background: #1a0000; }
+
+        .log-line .ts        { color: var(--ts); }
+        .log-line .lvl-INFO  { color: var(--l-info); }
+        .log-line .lvl-WARN  { color: var(--l-warn); }
+        .log-line .lvl-ERROR { color: var(--l-err);  }
+        .log-line .lvl-DEBUG { color: var(--l-debug); }
+        .log-line .src       { color: var(--dim2); }
+
+        .hl-conn { color: #5ac4d4; }
+        .hl-host { color: #c4b85a; }
+        .hl-lora { color: var(--accent); }
+        .hl-hex  { color: #a78bfa; }
+
+        /* ── SCROLLBARS ──────────────────────────────────────────── */
+        ::-webkit-scrollbar              { width: 5px; }
+        ::-webkit-scrollbar-track        { background: var(--bg); }
+        ::-webkit-scrollbar-thumb        { background: var(--border-hi); }
+        ::-webkit-scrollbar-thumb:hover  { background: var(--dim2); }
+
+        /* ── FOOTER ──────────────────────────────────────────────── */
+        footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border);
+            padding-top: 8px;
+            flex-shrink: 0;
+            font-size: 9px;
+            color: var(--dim);
+            letter-spacing: 0.1em;
+        }
+
+        footer a {
+            color: var(--dim2);
+            text-decoration: none;
+        }
+
+        footer a:hover { color: var(--accent); }
+
+        .text-right { text-align: right; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div style="display:flex; align-items:center; gap:15px;">
-            <div class="icon-wrap">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" 
-                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     style="color: var(--accent)">
-                    <line x1="12" y1="24" x2="12" y2="10"/>
-                    <path d="M8.5 6.5 A5 5 0 0 1 15.5 6.5"/>
-                    <path d="M5.5 3.5 A9 9 0 0 1 18.5 3.5"/>
-                    <circle cx="12" cy="10" r="1.2" fill="currentColor"/>
-                </svg>
-            </div>
-            <h1>DEAD <span style="opacity:0.4">//</span> MESH</h1>
-            <span class="stream-mode" id="mode-indicator">REALTIME</span>
+<!-- ── HEADER ──────────────────────────────────────────────────── -->
+<header>
+    <div class="wordmark">
+        <div class="icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 style="color: var(--accent)">
+                <line x1="12" y1="24" x2="12" y2="10"/>
+                <path d="M8.5 6.5 A5 5 0 0 1 15.5 6.5"/>
+                <path d="M5.5 3.5 A9 9 0 0 1 18.5 3.5"/>
+                <circle cx="12" cy="10" r="1.2" fill="currentColor"/>
+            </svg>
         </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-            <span class="badge">v1.0.0</span>
-            <span class="badge" id="api-status-badge" 
-                  style="background:#1a2e1d; color: var(--text-dim); border: 1px solid var(--border);">
-                <span class="status-indicator status-connecting"></span>CONNECTING...
-            </span>
-        </div>
-    </header>
+        <span class="wordmark-title">
+            D E A D &nbsp;<span class="slash">//</span>&nbsp; M E S H
+        </span>
+    </div>
+    <div class="header-right">
+        <span class="badge">v1.0.0</span>
+        <span class="badge badge-stream connecting" id="badge-stream">
+            <span class="pulse"></span>CONNECTING
+        </span>
+    </div>
+</header>
 
-    <!-- STATS — 5 cards now includes mesh node count -->
-    <div class="grid">
-        <div class="card">
-            <span class="card-label">Active Links</span>
-            <span class="card-value" id="val-active">--</span>
+<!-- ── STAT CARDS ───────────────────────────────────────────────── -->
+<div class="stats">
+    <div class="card">
+        <span class="card-label">Active Links</span>
+        <span class="card-value accent" id="val-active">—</span>
+        <div class="card-sub" id="sub-active">&nbsp;</div>
+    </div>
+    <div class="card">
+        <span class="card-label">Packets Relayed</span>
+        <span class="card-value" id="val-total">—</span>
+        <div class="card-sub" id="sub-total">&nbsp;</div>
+    </div>
+    <div class="card">
+        <span class="card-label">Bytes Bridged</span>
+        <span class="card-value" id="val-bytes">—</span>
+        <div class="card-sub" id="sub-bytes">&nbsp;</div>
+    </div>
+    <div class="card">
+        <span class="card-label">Mesh Nodes</span>
+        <span class="card-value" id="val-nodes">—</span>
+        <div class="card-sub" id="sub-nodes">&nbsp;</div>
+    </div>
+    <div class="card">
+        <span class="card-label">Gateway Uptime</span>
+        <span class="card-value" id="val-uptime">—</span>
+        <div class="card-sub" id="sub-uptime">&nbsp;</div>
+    </div>
+</div>
+
+<!-- ── WORKSPACE ────────────────────────────────────────────────── -->
+<div class="workspace">
+
+    <!-- LEFT: TABBED PANEL -->
+    <div class="left-panel">
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="nodes">Mesh Nodes</button>
+            <button class="tab-btn" data-tab="links">Proxy Links</button>
+            <button class="tab-btn" data-tab="messages">Messages</button>
+            <span class="tab-live">LIVE</span>
         </div>
-        <div class="card">
-            <span class="card-label">Packets Relayed</span>
-            <span class="card-value" id="val-total">--</span>
+
+        <!-- NODES TAB -->
+        <div class="tab-pane active" id="tab-nodes">
+            <div class="node-table-wrap">
+                <table class="node-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="id">Node</th>
+                            <th data-sort="long">Name</th>
+                            <th data-sort="hops" style="text-align:center">Hops</th>
+                            <th data-sort="snr" style="text-align:right">SNR</th>
+                            <th data-sort="battery" style="text-align:center">Bat</th>
+                            <th style="text-align:center">Pos</th>
+                            <th data-sort="last_heard" style="text-align:right">Last Heard</th>
+                        </tr>
+                    </thead>
+                    <tbody id="node-tbody">
+                        <tr><td colspan="7" class="node-empty">Awaiting mesh telemetry...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div class="card">
-            <span class="card-label">Bytes Bridged</span>
-            <span class="card-value" id="val-bytes">--</span>
+
+        <!-- LINKS TAB -->
+        <div class="tab-pane" id="tab-links">
+            <ul class="conn-list" id="conn-list">
+                <li class="conn-empty">No active proxy links</li>
+            </ul>
         </div>
-        <div class="card">
-            <span class="card-label">Mesh Nodes</span>
-            <span class="card-value" id="val-nodes">--</span>
-        </div>
-        <div class="card">
-            <span class="card-label">Gateway Uptime</span>
-            <span class="card-value" id="val-uptime">--</span>
+
+        <!-- MESSAGES TAB — content rendered in right panel -->
+        <div class="tab-pane" id="tab-messages">
+            <div style="padding:20px 12px; font-size:10px; color:var(--dim); letter-spacing:0.1em; text-align:center; margin-top:24px;">
+                MESSAGE LOG →
+            </div>
         </div>
     </div>
 
-    <div class="workspace">
-        <!-- LEFT: TABBED PANEL -->
-        <div class="left-panel">
-            <div class="tab-bar">
-                <button class="tab-btn active" data-tab="nodes">Mesh Nodes</button>
-                <button class="tab-btn" data-tab="links">Proxy Links</button>
-                <button class="tab-btn" data-tab="messages">Messages</button>
-                <span class="tab-live">LIVE</span>
-            </div>
-
-            <!-- NODES TAB -->
-            <div class="tab-pane active" id="tab-nodes">
-                <div class="node-table-wrap">
-                    <table class="node-table">
-                        <thead>
-                            <tr>
-                                <th data-sort="id">Node</th>
-                                <th data-sort="long">Name</th>
-                                <th data-sort="hops" style="text-align:center">Hops</th>
-                                <th data-sort="snr" style="text-align:right">SNR</th>
-                                <th data-sort="battery" style="text-align:center">Bat</th>
-                                <th style="text-align:center">Pos</th>
-                                <th data-sort="last_heard" style="text-align:right">Last Heard</th>
-                            </tr>
-                        </thead>
-                        <tbody id="node-tbody">
-                            <tr><td colspan="7" class="node-empty">Awaiting mesh telemetry...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- LINKS TAB -->
-            <div class="tab-pane" id="tab-links">
-                <ul class="conn-list" id="conn-list">
-                    <li class="conn-row" style="text-align:center; display:block; opacity:0.4; padding:20px;">
-                        No active proxy links
-                    </li>
-                </ul>
-            </div>
-
-            <!-- MESSAGES TAB — content lives in right panel -->
-            <div class="tab-pane" id="tab-messages">
-                <div style="padding:20px 15px; font-size:11px; color:var(--text-dim); opacity:0.6; text-align:center; margin-top:30px;">
-                    Message log →
-                </div>
-            </div>
+    <!-- RIGHT: MESSAGE PANEL (shown when Messages tab active) -->
+    <div class="msg-log-panel" id="msg-panel" style="display:none;">
+        <div class="panel-head">
+            <span class="panel-head-label">Mesh Messages</span>
+            <span style="font-size:9px; color:var(--accent); letter-spacing:0.1em;" id="msg-channel">Channel / Primary</span>
+            <span class="panel-head-meta" id="msg-count" style="margin-left:auto;">0 messages</span>
         </div>
-
-        <!-- RIGHT: MESSAGE CHAT LOG (shown when Messages tab active) -->
-        <div class="terminal-panel" id="msg-panel" style="display:none; flex-direction:column;">
-            <div class="panel-head">
-                <span>MESH MESSAGES</span>
-                <span style="font-size:10px; color:var(--accent); margin-left:8px;" id="msg-channel">Channel / Primary</span>
-                <span style="font-size:10px; color:var(--text-dim); margin-left:auto;" id="msg-count">0 messages</span>
+        <div class="msg-scroll" id="msg-scroll">
+            <div class="msg-empty-state" id="msg-empty-state">
+                LISTENING FOR MESH TRAFFIC...
             </div>
-            <div style="flex:1; overflow-y:auto; padding:8px 0;" id="msg-scroll">
-                <div id="msg-empty-state" style="padding:40px; text-align:center; opacity:0.3; font-size:11px; letter-spacing:0.1em;">
-                    &nbsp; LISTENING FOR MESH TRAFFIC...
-                </div>
-            </div>
-        </div>
-
-        <!-- RIGHT: LOG -->
-        <div class="terminal-panel" id="log-panel">
-            <div class="panel-head">
-                <span>GATEWAY LOG</span>
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <label style="font-size:10px; cursor:pointer;">
-                        <input type="checkbox" checked id="auto-scroll"> AUTO-SCROLL
-                    </label>
-                </div>
-            </div>
-            <div class="terminal-window" id="terminal"></div>
         </div>
     </div>
+
+    <!-- RIGHT: LOG PANEL -->
+    <div class="log-panel" id="log-panel">
+        <div class="log-controls">
+            <span class="panel-head-label">Gateway Log</span>
+            <button class="log-filter-btn active" id="filter-all"  onclick="setFilter('ALL')">ALL</button>
+            <button class="log-filter-btn"        id="filter-info" onclick="setFilter('INFO')">INFO</button>
+            <button class="log-filter-btn"        id="filter-info" onclick="setFilter('MESH')">MESH</button>
+            <button class="log-filter-btn"        id="filter-warn" onclick="setFilter('WARN')">WARN</button>
+            <button class="log-filter-btn"        id="filter-err"  onclick="setFilter('ERROR')">ERR</button>
+            <span class="log-errcount zero" id="err-badge">0 errors</span>
+            <label class="log-autoscroll">
+                <input type="checkbox" id="auto-scroll" checked> AUTO-SCROLL
+            </label>
+        </div>
+        <div class="terminal" id="terminal"></div>
+    </div>
+
+</div>
+
+<!-- ── FOOTER ────────────────────────────────────────────────────── -->
+<footer>
+    <span id="footer-nodes">nodes: —</span>
+    <span id="footer-center">&nbsp;</span>
+    <a href="https://github.com/gnarzilla/deadmesh" target="_blank">github.com/gnarzilla/deadmesh</a>
+</footer>
 
 <script>
-    // ═══════════════════════════════════════════════════════════════════════
-    // CONFIG
-    // ═══════════════════════════════════════════════════════════════════════
-    const API_BASE     = 'http://127.0.0.1:8080';
-    const UI_BASE      = 'http://127.0.0.1:8081';
-    const SSE_ENDPOINT = API_BASE + '/api/stream';
-    const NODE_POLL_MS = 5000;
+'use strict';
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // STATE
-    // ═══════════════════════════════════════════════════════════════════════
-    let lastLogLine       = '';
-    let eventSource       = null;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_DELAY = 30000;
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════
+const API_BASE          = 'http://127.0.0.1:8080';
+const SSE_ENDPOINT      = API_BASE + '/api/stream';
+const MAX_LOG_LINES     = 600;
+const MAX_RECONNECT_DELAY = 30000;
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TABS
-    // ═══════════════════════════════════════════════════════════════════════
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let eventSource       = null;
+let reconnectAttempts = 0;
+let lastLogLine       = '';
+let logFilter         = 'ALL';
+let errorCount        = 0;
+const nodeMap         = {};     // id -> node
+const messageList     = [];     // ordered array, max 50
 
-            // Show message panel in right column when Messages tab active,
-            // otherwise show the gateway log
-            const isMessages = btn.dataset.tab === 'messages';
-            const msgPanel = document.getElementById('msg-panel');
-            const logPanel = document.getElementById('log-panel');
-            if (msgPanel) msgPanel.style.display = isMessages ? 'flex' : 'none';
-            if (logPanel) logPanel.style.display = isMessages ? 'none' : '';
-        });
+// ═══════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        const isMessages = btn.dataset.tab === 'messages';
+        document.getElementById('msg-panel').style.display  = isMessages ? 'flex' : 'none';
+        document.getElementById('log-panel').style.display  = isMessages ? 'none' : '';
     });
+});
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // UTILS
-    // ═══════════════════════════════════════════════════════════════════════
-    function formatBytes(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
+// ═══════════════════════════════════════════════════════════════════
+// FORMATTERS
+// ═══════════════════════════════════════════════════════════════════
+function formatBytes(n) {
+    if (n == null) return '—';
+    if (n < 1024)       return n + ' B';
+    if (n < 1048576)    return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1073741824) return (n / 1048576).toFixed(2) + ' MB';
+    return (n / 1073741824).toFixed(2) + ' GB';
+}
 
-    function formatUptime(seconds) {
-        if (!seconds) return '0s';
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = Math.floor(seconds % 60);
-        if (h > 0) return `${h}h ${m}m ${s}s`;
-        if (m > 0) return `${m}m ${s}s`;
-        return `${s}s`;
-    }
+function formatUptime(s) {
+    if (s == null) return '—';
+    s = Math.floor(s);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}h ${m}m ${sec}s`;
+    if (m > 0) return `${m}m ${sec}s`;
+    return `${sec}s`;
+}
 
-    function formatAge(age_s) {
-        if (age_s < 0)       return '—';
-        if (age_s < 60)      return `${age_s}s`;
-        if (age_s < 3600)    return `${Math.floor(age_s/60)}m`;
-        if (age_s < 86400)   return `${Math.floor(age_s/3600)}h`;
-        return `${Math.floor(age_s/86400)}d`;
-    }
+function formatAge(age_s) {
+    if (age_s < 0)     return '—';
+    if (age_s < 60)    return age_s + 's';
+    if (age_s < 3600)  return Math.floor(age_s / 60) + 'm';
+    if (age_s < 86400) return Math.floor(age_s / 3600) + 'h';
+    return Math.floor(age_s / 86400) + 'd';
+}
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+function esc(t) {
+    const d = document.createElement('div');
+    d.textContent = t;
+    return d.innerHTML;
+}
 
-    function renderLogLine(line) {
-        const regex = /^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s\[\s*([A-Z]+)\s*\]\s(.*)/;
-        const match = line.match(regex);
-        if (!match) {
-            return `<div class="log-line"><span class="msg">${escapeHtml(line)}</span></div>`;
-        }
-        const [_, ts, level, msg] = match;
-        let richMsg = escapeHtml(msg)
-            .replace(/(Connection \d+)/g,            '<span style="color:#6ee7b7">$1</span>')
-            .replace(/([a-zA-Z0-9.-]+\.com:\d+)/g,  '<span style="color:#fcd34d">$1</span>')
-            .replace(/(direct:\/\/)/g,               '<span style="color:#86efac">$1</span>')
-            .replace(/(LoRa|mesh|fragment|relay)/gi, '<span style="color:#4ade80">$1</span>')
-            .replace(/([0-9a-f]{8})/g,               '<span style="color:#a78bfa">$1</span>');
+// ═══════════════════════════════════════════════════════════════════
+// LOG FILTER
+// ═══════════════════════════════════════════════════════════════════
+function shouldHide(level) {
+    if (logFilter === 'ALL')   return false;
+    if (logFilter === 'INFO')  return level === 'DEBUG';
+    if (logFilter === 'WARN')  return level !== 'WARN' && level !== 'ERROR';
+    if (logFilter === 'ERROR') return level !== 'ERROR';
+    return false;
+}
 
-        return `<div class="log-line">
-            <span class="ts">${ts}</span>
-            <span class="lvl-${level.trim()}">[${level}]</span>
-            <span class="msg" style="margin-left:10px">${richMsg}</span>
-        </div>`;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // NODE TABLE — SORT STATE
-    // ═══════════════════════════════════════════════════════════════════════
-    let sortCol = 'last_heard';
-    let sortDir = -1; // -1 = desc, 1 = asc
-    // cachedNodes replaced by nodeMap (id->node) for SSE merge support
-
-    // Wire header clicks
-    document.querySelectorAll('table.node-table th[data-sort]').forEach(th => {
-        th.style.cursor = 'pointer';
-        th.addEventListener('click', () => {
-            if (sortCol === th.dataset.sort) {
-                sortDir *= -1;
-            } else {
-                sortCol = th.dataset.sort;
-                sortDir = -1;
-            }
-            updateSortIndicators();
-            renderNodes(Object.values(nodeMap));
-        });
+function setFilter(f) {
+    logFilter = f;
+    document.getElementById('filter-all').className  = 'log-filter-btn' + (f === 'ALL'   ? ' active' : '');
+    document.getElementById('filter-info').className = 'log-filter-btn' + (f === 'INFO'  ? ' active' : '');
+    document.getElementById('filter-warn').className = 'log-filter-btn' + (f === 'WARN'  ? ' active-warn' : '');
+    document.getElementById('filter-err').className  = 'log-filter-btn' + (f === 'ERROR' ? ' active-err'  : '');
+    document.querySelectorAll('.log-line[data-level]').forEach(el => {
+        el.classList.toggle('hidden', shouldHide(el.dataset.level));
     });
+}
 
-    function updateSortIndicators() {
-        document.querySelectorAll('table.node-table th[data-sort]').forEach(th => {
-            th.style.color = '';
-            const arrow = th.querySelector('.sort-arrow');
-            if (arrow) arrow.remove();
-        });
-        const active = document.querySelector(`th[data-sort="${sortCol}"]`);
-        if (active) {
-            active.style.color = 'var(--accent)';
-            const arrow = document.createElement('span');
-            arrow.className = 'sort-arrow';
-            arrow.textContent = sortDir === -1 ? ' ▼' : ' ▲';
-            arrow.style.fontSize = '9px';
-            active.appendChild(arrow);
-        }
+function updateErrorBadge() {
+    const badge = document.getElementById('err-badge');
+    badge.textContent = errorCount + (errorCount === 1 ? ' error' : ' errors');
+    badge.classList.toggle('zero', errorCount === 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LOG RENDERING
+// ═══════════════════════════════════════════════════════════════════
+function renderLogLine(raw) {
+    // Format: "2026-05-22 10:36:42 [INFO] deadmesh: message"
+    //     or: "2026-05-22 10:36:42 [INFO ] deadmesh: message"
+    const m = raw.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[\s*(\w+)\s*\](?:\s(\w+):)?\s(.*)$/);
+    if (!m) {
+        return `<span class="log-line"><span class="src">${esc(raw)}</span></span>`;
     }
-    updateSortIndicators();
+    const [, ts, level, src, msg] = m;
+    const lvl = level.trim();
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // NODE TABLE RENDER
-    // ═══════════════════════════════════════════════════════════════════════
-    function batteryHtml(level) {
-        if (level === 0) return '<span style="color:var(--text-dim)">—</span>';
-        if (level === 101) {
-            return `<div class="bat-bar"><div class="bat-fill bat-plug" style="width:100%"></div></div><span style="font-size:9px;color:#60a5fa">⚡</span>`;
-        }
-        const pct   = Math.min(100, Math.max(0, level));
-        const cls   = pct > 60 ? 'bat-high' : pct > 20 ? 'bat-med' : 'bat-low';
-        return `<div class="bat-bar"><div class="bat-fill ${cls}" style="width:${pct}%"></div></div><span style="font-size:9px">${pct}%</span>`;
+    if (lvl === 'WARN' || lvl === 'ERROR') {
+        errorCount++;
+        updateErrorBadge();
     }
 
-    function renderNodes(nodes) {
-        const tbody = document.getElementById('node-tbody');
-        if (!nodes || nodes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="node-empty">No nodes heard yet</td></tr>';
-            return;
-        }
+    let rich = esc(msg)
+        .replace(/(Connection \d+)/g,           '<span class="hl-conn">$1</span>')
+        .replace(/([a-zA-Z0-9][-a-zA-Z0-9.]+\.[a-z]{2,}:\d+)/g, '<span class="hl-host">$1</span>')
+        .replace(/(LoRa|mesh|fragment|relay)/gi, '<span class="hl-lora">$1</span>')
+        .replace(/([0-9a-f]{8})/g,              '<span class="hl-hex">$1</span>');
 
-        /* Sort: local node always first, then by chosen column */
-        const sorted = [...nodes].sort((a, b) => {
-            if (a.is_local !== b.is_local) return a.is_local ? -1 : 1;
-            let av = a[sortCol], bv = b[sortCol];
-            if (sortCol === 'long' || sortCol === 'short') {
-                av = (a.long || a.short || '').toLowerCase();
-                bv = (b.long || b.short || '').toLowerCase();
-            }
-            if (av === undefined || av === null) av = -Infinity;
-            if (bv === undefined || bv === null) bv = -Infinity;
-            if (av < bv) return sortDir;
-            if (av > bv) return -sortDir;
-            return 0;
-        });
-        const nodes_to_render = sorted;
+    const isWarn = lvl === 'WARN';
+    const isErr  = lvl === 'ERROR';
+    const extra  = isErr ? ' is-err' : isWarn ? ' is-warn' : '';
+    const hidden = shouldHide(lvl) ? ' hidden' : '';
 
-        const rows = nodes_to_render.map(n => {
-            const nameClass = n.is_local ? 'node-local' : 'node-name';
-            const displayName = n.long || n.short || '—';
-            const shortTag  = n.short ? `<span class="node-id">${escapeHtml(n.short)}</span> ` : '';
-            const hops      = n.hops >= 0 ? n.hops : '—';
-            const snr       = n.snr !== 0 ? n.snr.toFixed(1) + ' dB' : '—';
-            const posClass  = n.has_position ? 'has-pos' : '';
-            const posTip    = n.has_position
-                ? `title="${n.lat.toFixed(5)}, ${n.lon.toFixed(5)}"` : '';
+    return `<div class="log-line${extra}${hidden}" data-level="${lvl}">` +
+        `<span class="ts">${ts} </span>` +
+        `<span class="lvl-${lvl}">[${lvl}]</span> ` +
+        (src ? `<span class="src">${esc(src)}: </span>` : '') +
+        `<span>${rich}</span>` +
+        `</div>`;
+}
 
-            return `<tr>
-                <td class="node-id">${n.id}${n.is_local ? ' <span style="color:var(--accent);font-size:9px">[LOCAL]</span>' : ''}</td>
-                <td>${shortTag}<span class="${nameClass}">${escapeHtml(displayName)}</span></td>
-                <td class="node-hops">${hops}</td>
-                <td class="node-snr">${snr}</td>
-                <td class="node-bat">${batteryHtml(n.battery)}</td>
-                <td style="text-align:center"><span class="pos-dot ${posClass}" ${posTip}></span></td>
-                <td class="node-age">${formatAge(n.age_s)}</td>
-            </tr>`;
-        });
-
-        tbody.innerHTML = rows.join('');
+function appendLogs(logs) {
+    if (!logs.length) return;
+    let newLogs = logs;
+    if (lastLogLine) {
+        const idx = logs.lastIndexOf(lastLogLine);
+        if (idx !== -1) newLogs = logs.slice(idx + 1);
     }
+    if (!newLogs.length) return;
+    lastLogLine = logs[logs.length - 1];
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // NODE DATA — initial load + SSE push, slow fallback poll
-    // ═══════════════════════════════════════════════════════════════════════
+    const term = document.getElementById('terminal');
+    const frag = document.createDocumentFragment();
+    newLogs.forEach(line => {
+        const tpl = document.createElement('template');
+        tpl.innerHTML = renderLogLine(line);
+        frag.appendChild(tpl.content);
+    });
+    term.appendChild(frag);
 
-    // nodeMap: id -> node object, so SSE updates can merge cleanly
-    const nodeMap = {};
-
-    async function pollNodes() {
-        try {
-            const res  = await fetch(API_BASE + '/api/nodes');
-            if (!res.ok) return;
-            const data = await res.json();
-            // Merge into nodeMap
-            (data.nodes || []).forEach(n => { nodeMap[n.id] = n; });
-            renderNodes(Object.values(nodeMap));
-            document.getElementById('val-nodes').textContent = data.total ?? '—';
-        } catch (e) { /* silent */ }
+    while (term.childElementCount > MAX_LOG_LINES) term.removeChild(term.firstChild);
+    if (document.getElementById('auto-scroll').checked) {
+        term.scrollTop = term.scrollHeight;
     }
+}
 
-    // Initial load, then slow fallback poll (30s) for any missed SSE events
-    pollNodes();
-    setInterval(pollNodes, 30000);
+// ═══════════════════════════════════════════════════════════════════
+// NODE TABLE — SORT
+// ═══════════════════════════════════════════════════════════════════
+let sortCol = 'last_heard';
+let sortDir = -1;
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // MESSAGES
-    // ═══════════════════════════════════════════════════════════════════════
-    let lastMsgCount = 0;
-
-    function nodeDisplayName(nodeId) {
-        // Look up name from cached node table if available
-        const node = nodeMap[nodeId];
-        if (!node) return nodeId;
-        return node.long || node.short || nodeId;
-    }
-
-    function renderMessages(messages, total) {
-        const scroll   = document.getElementById('msg-scroll');
-        const empty    = document.getElementById('msg-empty-state');
-        const countEl  = document.getElementById('msg-count');
-
-        if (!messages || messages.length === 0) {
-            if (empty) empty.style.display = '';
-            if (countEl) countEl.textContent = '0 messages';
-            lastMsgCount = 0;
-            return;
-        }
-
-        const isNew = total > lastMsgCount;
-        const prevCount = lastMsgCount;
-        lastMsgCount = total;
-
-        if (empty) empty.style.display = 'none';
-        if (countEl) countEl.textContent = `${total} message${total !== 1 ? 's' : ''}`;
-
-        // Oldest-first — natural chat flow (server returns oldest-first already)
-        const wasAtBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 40;
-
-        scroll.innerHTML = messages.map((m, i) => {
-            const name   = escapeHtml(nodeDisplayName(m.from));
-            const nameIsId = name === m.from; // no name resolved yet
-            const text   = escapeHtml(m.text);
-            const hops   = m.hops > 0 ? `${m.hops}hop` : 'direct';
-            const snr    = m.snr !== 0 ? `${m.snr.toFixed(1)}dB` : '';
-            const ago    = formatAge(Math.floor(Date.now()/1000) - m.ts);
-            const isNewMsg = isNew && i >= prevCount;
-            return `<div class="msg-bubble${isNewMsg ? ' msg-new' : ''}">
-                <div class="msg-bubble-header">
-                    <span class="msg-sender">${name}</span>
-                    ${!nameIsId ? `<span class="msg-sender-id">${m.from}</span>` : ''}
-                    <div class="msg-badges">
-                        <span class="msg-badge hops">${hops}</span>
-                        ${snr ? `<span class="msg-badge snr">${snr}</span>` : ''}
-                    </div>
-                    <span class="msg-ts">${ago} ago</span>
-                </div>
-                <div class="msg-body">${text}</div>
-            </div>`;
-        }).join('');
-
-        // Auto-scroll to bottom if user was already there
-        if (wasAtBottom || isNew) {
-            scroll.scrollTop = scroll.scrollHeight;
-        }
-
-        // Flash tab label when new message arrives on another tab
-        const activeTab = document.querySelector('.tab-btn.active');
-        if (isNew && activeTab && activeTab.dataset.tab !== 'messages') {
-            const msgBtn = document.querySelector('[data-tab="messages"]');
-            if (msgBtn) {
-                msgBtn.style.color = 'var(--accent)';
-                setTimeout(() => { msgBtn.style.color = ''; }, 3000);
-            }
-        }
-    }
-
-    // messageList: ordered array of message objects
-    const messageList = [];
-
-    async function pollMessages() {
-        try {
-            const res = await fetch(API_BASE + '/api/messages');
-            if (!res.ok) return;
-            const data = await res.json();
-            // Merge — don't wipe messages already received via SSE
-            (data.messages || []).forEach(m => {
-                const exists = messageList.some(e => e.from === m.from && e.ts === m.ts);
-                if (!exists) messageList.push(m);
-            });
-            // Keep sorted chronologically, capped at ring buffer size
-            messageList.sort((a, b) => a.ts - b.ts);
-            if (messageList.length > 50) messageList.splice(0, messageList.length - 50);
-            renderMessages(messageList, messageList.length);
-        } catch (e) { /* silent */ }
-    }
-
-    // Initial load, then slow fallback poll (30s)
-    pollMessages();
-    setInterval(pollMessages, 30000);
-
-    // Age column ticks every second client-side — no server round-trip needed.
-    setInterval(() => {
-        if (!Object.keys(nodeMap).length) return;
-        const now = Math.floor(Date.now() / 1000);
-        Object.values(nodeMap).forEach(n => {
-            n.age_s = n.last_heard > 0 ? now - n.last_heard : -1;
-        });
+document.querySelectorAll('table.node-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        sortCol === th.dataset.sort ? (sortDir *= -1) : (sortCol = th.dataset.sort, sortDir = -1);
+        updateSortIndicators();
         renderNodes(Object.values(nodeMap));
-    }, 1000);
+    });
+});
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // STATUS BADGE
-    // ═══════════════════════════════════════════════════════════════════════
-    function updateApiStatus(status) {
-        const badge = document.getElementById('api-status-badge');
-        if (status === 'online') {
-            badge.innerHTML = '<span class="status-indicator status-online"></span>STREAMING';
-            badge.style.background = 'var(--accent)';
-            badge.style.color = '#000';
-            badge.style.border = 'none';
-            reconnectAttempts = 0;
-        } else if (status === 'connecting') {
-            badge.innerHTML = '<span class="status-indicator status-connecting"></span>CONNECTING...';
-            badge.style.background = '#1a2e1d';
-            badge.style.color = '#fbbf24';
-            badge.style.border = '1px solid var(--border)';
-        } else {
-            const retryIn = Math.min(2 ** reconnectAttempts, 30);
-            badge.innerHTML = `<span class="status-indicator status-offline"></span>OFFLINE (retry ${retryIn}s)`;
-            badge.style.background = '#1a0a0a';
-            badge.style.color = '#f87171';
-            badge.style.border = '1px solid #3a1a1a';
-        }
+function updateSortIndicators() {
+    document.querySelectorAll('table.node-table th[data-sort]').forEach(th => {
+        th.style.color = '';
+        const a = th.querySelector('.sort-arrow');
+        if (a) a.remove();
+    });
+    const active = document.querySelector(`th[data-sort="${sortCol}"]`);
+    if (active) {
+        active.style.color = 'var(--accent)';
+        const arrow = document.createElement('span');
+        arrow.className = 'sort-arrow';
+        arrow.textContent = sortDir === -1 ? ' ▼' : ' ▲';
+        arrow.style.fontSize = '8px';
+        active.appendChild(arrow);
+    }
+}
+updateSortIndicators();
+
+// ═══════════════════════════════════════════════════════════════════
+// NODE TABLE — RENDER
+// ═══════════════════════════════════════════════════════════════════
+function batteryHtml(level) {
+    if (!level || level === 0) return '<span style="color:var(--dim)">—</span>';
+    if (level === 101) {
+        return `<div class="bat-bar"><div class="bat-fill bat-plug" style="width:100%"></div></div>` +
+               `<span style="font-size:9px;color:#60a5fa">⚡</span>`;
+    }
+    const pct = Math.min(100, Math.max(0, level));
+    const cls = pct > 60 ? 'bat-high' : pct > 20 ? 'bat-med' : 'bat-low';
+    return `<div class="bat-bar"><div class="bat-fill ${cls}" style="width:${pct}%"></div></div>` +
+           `<span style="font-size:9px">${pct}%</span>`;
+}
+
+function renderNodes(nodes) {
+    const tbody = document.getElementById('node-tbody');
+    if (!nodes || nodes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="node-empty">No nodes heard yet</td></tr>';
+        return;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // DASHBOARD UPDATE (from SSE)
-    // ═══════════════════════════════════════════════════════════════════════
-    function updateDashboard(data) {
-        const metrics = data.metrics;
-
-        document.getElementById('val-active').innerText =
-            metrics.active_connections + ' / ' + metrics.total_connections;
-        document.getElementById('val-total').innerText  = metrics.total_connections;
-        document.getElementById('val-bytes').innerText  = formatBytes(metrics.bytes_transferred);
-        document.getElementById('val-uptime').innerText = formatUptime(metrics.uptime);
-
-        /* Proxy links panel */
-        const list = document.getElementById('conn-list');
-        let html = '';
-        let hasActive = false;
-        for (const [proto, stats] of Object.entries(metrics.protocols)) {
-            if (stats.active > 0) {
-                hasActive = true;
-                html += `<li class="conn-row">
-                    <span class="proto-tag">LNK</span>
-                    <span style="font-weight:bold">${proto}</span>
-                    <span class="active-count">${stats.active} ACTIVE</span>
-                </li>`;
-            }
+    const sorted = [...nodes].sort((a, b) => {
+        if (a.is_local !== b.is_local) return a.is_local ? -1 : 1;
+        let av = a[sortCol], bv = b[sortCol];
+        if (sortCol === 'long' || sortCol === 'short') {
+            av = (a.long || a.short || '').toLowerCase();
+            bv = (b.long || b.short || '').toLowerCase();
         }
-        list.innerHTML = hasActive
-            ? html
-            : '<li class="conn-row" style="opacity:0.4; justify-content:center; display:block; padding:20px; text-align:center;">No active links</li>';
+        if (av == null) av = -Infinity;
+        if (bv == null) bv = -Infinity;
+        return av < bv ? sortDir : av > bv ? -sortDir : 0;
+    });
 
-        /* Log lines */
-        const logs   = data.logs || [];
-        const term   = document.getElementById('terminal');
-        let newLogs  = [];
-        if (lastLogLine === '') {
-            newLogs = logs;
-        } else {
-            const idx = logs.indexOf(lastLogLine);
-            newLogs   = idx !== -1 ? logs.slice(idx + 1) : logs;
-        }
-        if (newLogs.length > 0) {
-            lastLogLine = logs[logs.length - 1];
-            newLogs.forEach(line => {
-                const div = document.createElement('div');
-                div.innerHTML = renderLogLine(line);
-                term.appendChild(div);
-            });
-            if (document.getElementById('auto-scroll').checked) {
-                term.scrollTop = term.scrollHeight;
-            }
-            while (term.childElementCount > 500) term.removeChild(term.firstChild);
-        }
+    tbody.innerHTML = sorted.map(n => {
+        const nameClass   = n.is_local ? 'node-local' : 'node-name';
+        const displayName = n.long || n.short || '—';
+        const shortTag    = n.short ? `<span class="node-id">${esc(n.short)}</span> ` : '';
+        const hops        = n.hops >= 0 ? n.hops : '—';
+        const snr         = n.snr !== 0 ? n.snr.toFixed(1) + ' dB' : '—';
+        const posClass    = n.has_position ? 'has-pos' : '';
+        const posTip      = n.has_position ? `title="${n.lat.toFixed(5)}, ${n.lon.toFixed(5)}"` : '';
+        const localTag    = n.is_local
+            ? ' <span style="color:var(--accent);font-size:9px;letter-spacing:0.05em">[LOCAL]</span>' : '';
+        return `<tr>
+            <td class="node-id">${esc(n.id)}${localTag}</td>
+            <td>${shortTag}<span class="${nameClass}">${esc(displayName)}</span></td>
+            <td class="node-hops">${hops}</td>
+            <td class="node-snr">${snr}</td>
+            <td style="text-align:center">${batteryHtml(n.battery)}</td>
+            <td style="text-align:center"><span class="pos-dot ${posClass}" ${posTip}></span></td>
+            <td class="node-age">${formatAge(n.age_s)}</td>
+        </tr>`;
+    }).join('');
+
+    // Update footer
+    const total = nodes.length;
+    const local = nodes.filter(n => n.is_local).length;
+    document.getElementById('footer-nodes').textContent =
+        `nodes: ${total}${local ? ' (' + local + ' local)' : ''}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// NODE POLL
+// ═══════════════════════════════════════════════════════════════════
+async function pollNodes() {
+    try {
+        const res  = await fetch(API_BASE + '/api/nodes');
+        if (!res.ok) return;
+        const data = await res.json();
+        (data.nodes || []).forEach(n => { nodeMap[n.id] = n; });
+        renderNodes(Object.values(nodeMap));
+        document.getElementById('val-nodes').textContent = data.total ?? '—';
+        document.getElementById('sub-nodes').textContent =
+            data.total > 0 ? data.total + ' seen this session' : '';
+    } catch (_) {}
+}
+
+pollNodes();
+setInterval(pollNodes, 30000);
+
+// Age ticks client-side every second
+setInterval(() => {
+    if (!Object.keys(nodeMap).length) return;
+    const now = Math.floor(Date.now() / 1000);
+    Object.values(nodeMap).forEach(n => {
+        n.age_s = n.last_heard > 0 ? now - n.last_heard : -1;
+    });
+    renderNodes(Object.values(nodeMap));
+}, 1000);
+
+// ═══════════════════════════════════════════════════════════════════
+// MESSAGES
+// ═══════════════════════════════════════════════════════════════════
+let lastMsgCount = 0;
+
+function nodeDisplayName(nodeId) {
+    const node = nodeMap[nodeId];
+    if (!node) return nodeId;
+    return node.long || node.short || nodeId;
+}
+
+function renderMessages(messages, total) {
+    const scroll  = document.getElementById('msg-scroll');
+    const empty   = document.getElementById('msg-empty-state');
+    const countEl = document.getElementById('msg-count');
+
+    if (!messages || messages.length === 0) {
+        if (empty) empty.style.display = '';
+        if (countEl) countEl.textContent = '0 messages';
+        lastMsgCount = 0;
+        return;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // SSE
-    // ═══════════════════════════════════════════════════════════════════════
-    function connectSSE() {
-        updateApiStatus('connecting');
-        eventSource = new EventSource(SSE_ENDPOINT);
+    const prevCount = lastMsgCount;
+    const isNew = total > prevCount;
+    lastMsgCount = total;
 
-        eventSource.addEventListener('dashboard', (event) => {
-            try {
-                updateDashboard(JSON.parse(event.data));
-                updateApiStatus('online');
-            } catch (err) {
-                console.error('[SSE] Parse error:', err);
-            }
-        });
+    if (empty) empty.style.display = 'none';
+    if (countEl) countEl.textContent = `${total} message${total !== 1 ? 's' : ''}`;
 
-        // ── Mesh node update — merge single node into nodeMap ──────────
-        eventSource.addEventListener('node_update', (event) => {
-            try {
-                const node = JSON.parse(event.data);
-                const now  = Math.floor(Date.now() / 1000);
-                node.age_s = node.last_heard > 0 ? now - node.last_heard : -1;
-                nodeMap[node.id] = { ...(nodeMap[node.id] || {}), ...node };
-                renderNodes(Object.values(nodeMap));
-                document.getElementById('val-nodes').textContent =
-                    Object.keys(nodeMap).length;
-            } catch (err) {
-                console.error('[SSE] node_update parse error:', err);
-            }
-        });
+    const wasAtBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 40;
 
-        // ── New mesh text message ──────────────────────────────────────
-        eventSource.addEventListener('message', (event) => {
-            try {
-                const msg = JSON.parse(event.data);
-                // Deduplicate — SSE may replay messages already loaded by pollMessages()
-                const exists = messageList.some(m => m.from === msg.from && m.ts === msg.ts);
-                if (!exists) {
-                    messageList.push(msg);
-                    // Keep at most 50 (matches server ring buffer size)
-                    if (messageList.length > 50) messageList.shift();
-                    renderMessages(messageList, messageList.length);
-                }
-            } catch (err) {
-                console.error('[SSE] message parse error:', err);
-            }
-        });
+    scroll.innerHTML = messages.map((m, i) => {
+        const name     = esc(nodeDisplayName(m.from));
+        const nameIsId = name === m.from;
+        const text     = esc(m.text);
+        const hops     = m.hops > 0 ? `${m.hops}hop` : 'direct';
+        const snr      = m.snr !== 0 ? `${m.snr.toFixed(1)}dB` : '';
+        const ago      = formatAge(Math.floor(Date.now() / 1000) - m.ts);
+        const isNewMsg = isNew && i >= prevCount;
+        return `<div class="msg-bubble${isNewMsg ? ' msg-new' : ''}">
+            <div class="msg-bubble-header">
+                <span class="msg-sender">${name}</span>
+                ${!nameIsId ? `<span class="msg-sender-id">${esc(m.from)}</span>` : ''}
+                <div class="msg-badges">
+                    <span class="msg-badge hops">${hops}</span>
+                    ${snr ? `<span class="msg-badge snr">${snr}</span>` : ''}
+                </div>
+                <span class="msg-ts">${ago} ago</span>
+            </div>
+            <div class="msg-body">${text}</div>
+        </div>`;
+    }).join('');
 
-        // ── Channel info — update label from device ────────────────────
-        eventSource.addEventListener('channel_info', (event) => {
-            try {
-                const ch = JSON.parse(event.data);
-                // Only update from primary channel (index 0)
-                if (ch.channel_index === 0 || ch.channel_role === 'Primary') {
-                    document.getElementById('msg-channel').textContent =
-                        ch.channel_name + ' / ' + ch.channel_role;
-                }
-            } catch (err) {
-                console.error('[SSE] channel_info parse error:', err);
-            }
-        });
+    if (wasAtBottom || isNew) scroll.scrollTop = scroll.scrollHeight;
 
-        eventSource.onopen = () => {
-            updateApiStatus('online');
-            reconnectAttempts = 0;
-        };
-
-        eventSource.onerror = () => {
-            eventSource.close();
-            updateApiStatus('offline');
-            reconnectAttempts++;
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
-            setTimeout(connectSSE, delay);
-        };
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // POLLING FALLBACK
-    // ═══════════════════════════════════════════════════════════════════════
-    function switchToPollingMode() {
-        document.getElementById('mode-indicator').textContent = '🔄 POLLING';
-        if (eventSource) { eventSource.close(); eventSource = null; }
-
-        async function poll() {
-            try {
-                const res = await fetch(API_BASE + '/api/dashboard');
-                if (!res.ok) throw new Error(`${res.status}`);
-                updateDashboard(await res.json());
-                updateApiStatus('online');
-            } catch {
-                updateApiStatus('offline');
-            }
+    // Flash tab when message arrives while not on messages tab
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (isNew && activeTab && activeTab.dataset.tab !== 'messages') {
+        const msgBtn = document.querySelector('[data-tab="messages"]');
+        if (msgBtn) {
+            msgBtn.style.color = 'var(--accent)';
+            setTimeout(() => { msgBtn.style.color = ''; }, 3000);
         }
+    }
+}
 
-        poll();
-        setInterval(poll, 3000);
+async function pollMessages() {
+    try {
+        const res  = await fetch(API_BASE + '/api/messages');
+        if (!res.ok) return;
+        const data = await res.json();
+        (data.messages || []).forEach(m => {
+            const exists = messageList.some(e => e.from === m.from && e.ts === m.ts);
+            if (!exists) messageList.push(m);
+        });
+        messageList.sort((a, b) => a.ts - b.ts);
+        if (messageList.length > 50) messageList.splice(0, messageList.length - 50);
+        renderMessages(messageList, messageList.length);
+    } catch (_) {}
+}
+
+pollMessages();
+setInterval(pollMessages, 30000);
+
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD UPDATE
+// ═══════════════════════════════════════════════════════════════════
+function updateDashboard(data) {
+    const m = data.metrics || {};
+
+    const active = m.active_connections ?? '—';
+    const total  = m.total_connections  ?? '—';
+    document.getElementById('val-active').textContent = active + ' / ' + total;
+    document.getElementById('sub-active').textContent = total !== '—' ? total + ' lifetime' : '';
+    document.getElementById('val-total').textContent  = total;
+    document.getElementById('val-bytes').textContent  = formatBytes(m.bytes_transferred);
+    document.getElementById('val-uptime').textContent = formatUptime(m.uptime);
+    if (m.server_info && m.server_info.port) {
+        document.getElementById('sub-uptime').textContent = 'port ' + m.server_info.port;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // INIT
-    // ═══════════════════════════════════════════════════════════════════════
-    if (typeof EventSource !== 'undefined') {
-        connectSSE();
-        setTimeout(() => { if (reconnectAttempts > 10) switchToPollingMode(); }, 60000);
+    // Proxy links panel
+    const list = document.getElementById('conn-list');
+    let html = '';
+    let hasActive = false;
+    for (const [proto, stats] of Object.entries(m.protocols || {})) {
+        if (stats.active > 0) {
+            hasActive = true;
+            html += `<li class="conn-row">
+                <span class="conn-proto-tag">LNK</span>
+                <span style="font-weight:500">${esc(proto)}</span>
+                <span class="conn-active-count">${stats.active} active</span>
+            </li>`;
+        }
+    }
+    list.innerHTML = hasActive
+        ? html
+        : '<li class="conn-empty">No active proxy links</li>';
+
+    appendLogs(data.logs || []);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STREAM BADGE
+// ═══════════════════════════════════════════════════════════════════
+function setStreamStatus(s) {
+    const badge = document.getElementById('badge-stream');
+    badge.className = 'badge badge-stream';
+    if (s === 'online') {
+        badge.innerHTML = '<span class="pulse"></span>STREAMING';
+        reconnectAttempts = 0;
+    } else if (s === 'connecting') {
+        badge.className += ' connecting';
+        badge.innerHTML = '<span class="pulse"></span>CONNECTING';
     } else {
-        switchToPollingMode();
+        badge.className += ' offline';
+        const next = Math.min(2 ** reconnectAttempts, 30);
+        badge.innerHTML = `<span class="pulse"></span>OFFLINE  retry ${next}s`;
     }
+}
 
-    window.addEventListener('beforeunload', () => { if (eventSource) eventSource.close(); });
+// ═══════════════════════════════════════════════════════════════════
+// SSE
+// ═══════════════════════════════════════════════════════════════════
+function connectSSE() {
+    setStreamStatus('connecting');
+    eventSource = new EventSource(SSE_ENDPOINT);
+
+    eventSource.addEventListener('dashboard', e => {
+        try {
+            updateDashboard(JSON.parse(e.data));
+            setStreamStatus('online');
+        } catch (err) {
+            console.error('[SSE] parse error:', err);
+        }
+    });
+
+    eventSource.addEventListener('node_update', e => {
+        try {
+            const node = JSON.parse(e.data);
+            const now  = Math.floor(Date.now() / 1000);
+            node.age_s = node.last_heard > 0 ? now - node.last_heard : -1;
+            nodeMap[node.id] = { ...(nodeMap[node.id] || {}), ...node };
+            renderNodes(Object.values(nodeMap));
+            document.getElementById('val-nodes').textContent = Object.keys(nodeMap).length;
+        } catch (err) {
+            console.error('[SSE] node_update error:', err);
+        }
+    });
+
+    eventSource.addEventListener('message', e => {
+        try {
+            const msg = JSON.parse(e.data);
+            const exists = messageList.some(m => m.from === msg.from && m.ts === msg.ts);
+            if (!exists) {
+                messageList.push(msg);
+                if (messageList.length > 50) messageList.shift();
+                renderMessages(messageList, messageList.length);
+            }
+        } catch (err) {
+            console.error('[SSE] message error:', err);
+        }
+    });
+
+    eventSource.addEventListener('channel_info', e => {
+        try {
+            const ch = JSON.parse(e.data);
+            if (ch.channel_index === 0 || ch.channel_role === 'Primary') {
+                document.getElementById('msg-channel').textContent =
+                    ch.channel_name + ' / ' + ch.channel_role;
+            }
+        } catch (err) {
+            console.error('[SSE] channel_info error:', err);
+        }
+    });
+
+    eventSource.onopen = () => {
+        setStreamStatus('online');
+        reconnectAttempts = 0;
+    };
+
+    eventSource.onerror = () => {
+        eventSource.close();
+        setStreamStatus('offline');
+        reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
+        setTimeout(connectSSE, delay);
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// POLLING FALLBACK
+// ═══════════════════════════════════════════════════════════════════
+function switchToPolling() {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    document.getElementById('badge-stream').textContent = 'POLLING';
+
+    async function poll() {
+        try {
+            const res = await fetch(API_BASE + '/api/dashboard');
+            if (!res.ok) throw new Error(res.status);
+            updateDashboard(await res.json());
+            setStreamStatus('online');
+        } catch (_) {
+            setStreamStatus('offline');
+        }
+    }
+    poll();
+    setInterval(poll, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+if (typeof EventSource !== 'undefined') {
+    connectSSE();
+    setTimeout(() => { if (reconnectAttempts > 10) switchToPolling(); }, 60000);
+} else {
+    switchToPolling();
+}
+
+window.addEventListener('beforeunload', () => { if (eventSource) eventSource.close(); });
 </script>
 </body>
 </html>

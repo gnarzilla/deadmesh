@@ -21,6 +21,21 @@
 #include "core/utils.h"
 #include "core/logging.h"
 
+/* Raw HTTP request tracing.
+ * Enable with:
+ *   DEADMESH_API_TRACE=1 ./bin/deadmesh -c deadmesh -v
+ */
+static gboolean api_trace_enabled(void) {
+    static gint cached = -1;
+
+    if (cached == -1) {
+        const gchar *v = g_getenv("DEADMESH_API_TRACE");
+        cached = (v && *v && g_strcmp0(v, "0") != 0) ? 1 : 0;
+    }
+
+    return cached == 1;
+}
+
 /* =========================================================================
  * TYPES
  * ========================================================================= */
@@ -612,6 +627,10 @@ static DeadlightHandlerResult api_handle_messages_endpoint(DeadlightConnection *
 
     g_mutex_lock(&ctx->message_ring_mutex);
 
+    g_debug("API messages: ring_head=%d ring_count=%d",
+            ctx->message_ring_head,
+            ctx->message_ring_count);
+
     if (ctx->message_ring_count > 0) {
         /* Walk oldest-first: head points to the slot AFTER the oldest entry
          * when the ring is full, or to index 0 when it's not yet wrapped. */
@@ -680,12 +699,17 @@ static DeadlightHandlerResult api_handle_messages_endpoint(DeadlightConnection *
 static DeadlightHandlerResult api_handle(DeadlightConnection *conn, GError **error) {
     g_info("API handler for connection %lu", conn->id);
 
-    gchar *preview = g_strndup((gchar *)conn->client_buffer->data,
+    if (api_trace_enabled()) {
+        gchar *preview = g_strndup((gchar *)conn->client_buffer->data,
                                 MIN(conn->client_buffer->len, 500));
-    g_debug("API conn %lu: Raw request (%u bytes):\n%s",
-            conn->id, conn->client_buffer->len, preview);
-    g_free(preview);
 
+        g_debug("API conn %lu: Raw request (%zu bytes):\n%s",
+                conn->id,
+                (guint)conn->client_buffer->len,
+                preview);
+
+        g_free(preview);
+    }
     /* Parse HTTP request — single call (deadmesh had it duplicated) */
     DeadlightRequest *request = deadlight_request_new(conn);
     gchar *request_str = g_strndup((gchar *)conn->client_buffer->data,
@@ -798,10 +822,20 @@ static DeadlightHandlerResult api_handle(DeadlightConnection *conn, GError **err
         result = api_handle_metrics_endpoint(conn, error);
     }
     else if (g_str_equal(uri, "/api/nodes")) {
-        result = api_handle_nodes_endpoint(conn, error);
+        if (!g_str_equal(request->method, "GET")) {
+            result = api_send_json_response(conn, 405, "Method Not Allowed",
+                                            "{\"error\":\"GET required\"}", error);
+        } else {
+            result = api_handle_nodes_endpoint(conn, error);
+        }
     }
     else if (g_str_equal(uri, "/api/messages")) {
-        result = api_handle_messages_endpoint(conn, error);
+        if (!g_str_equal(request->method, "GET")) {
+            result = api_send_json_response(conn, 405, "Method Not Allowed",
+                                            "{\"error\":\"GET required\"}", error);
+        } else {
+            result = api_handle_messages_endpoint(conn, error);
+        }
     }
     else {
         g_debug("API: No route for URI: %s", uri);

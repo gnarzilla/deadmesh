@@ -13,6 +13,21 @@
 #include <glib.h>           // g_warning, g_debug
 #include <termios.h>        // tcflush(), TCIFLUSH
 
+/* Byte-level serial framing trace.
+ * Enable with:
+ *   DEADMESH_MESH_FRAME_TRACE=1 ./bin/deadmesh -c deadmesh -v
+ */
+static gboolean mesh_frame_trace_enabled(void) {
+    static gint cached = -1;
+
+    if (cached == -1) {
+        const gchar *v = g_getenv("DEADMESH_MESH_FRAME_TRACE");
+        cached = (v && *v && g_strcmp0(v, "0") != 0) ? 1 : 0;
+    }
+
+    return cached == 1;
+}
+
 /* ─────────────────────────────────────────────────────────────
  * Reader
  * ───────────────────────────────────────────────────────────── */
@@ -190,8 +205,13 @@ bool mesh_frame_read_blocking(int fd, MeshFrameReader *reader, MeshFrame *out) {
             size_t consumed = mesh_frame_reader_push(reader, buf + pos, (size_t)n - pos);
             pos += consumed;
 
-            g_debug("Pushed %zu bytes, new state=%d, pos=%u/%u",
-                    consumed, reader->state, reader->payload_pos, reader->payload_len);
+            if (mesh_frame_trace_enabled()) {
+                g_debug("Pushed %zu bytes, new state=%d, pos=%u/%u",
+                        consumed,
+                        reader->state,
+                        reader->payload_pos,
+                        reader->payload_len);
+            }
 
             if (reader->state == MESH_FRAME_STATE_READY) {
                 break;
