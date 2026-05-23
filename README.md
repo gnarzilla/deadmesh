@@ -18,11 +18,10 @@ Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosyst
 - Transparent fragmentation & reassembly over Meshtastic LoRa packets, with per-chunk unique packet IDs to defeat firmware-level deduplication on multi-chunk sessions
 - Full MITM proxy with caching, compression, ad-blocking, rate-limiting
 - Works with off-the-shelf Meshtastic hardware
-- Truly off-grid: solar-powered nodes can relay traffic across kilometers
 - Real-time embedded dashboard with live mesh visibility (nodes, SNR, positions, telemetry, chat)
 - Connection pooling + TLS session reuse to minimize airtime
 
-The goal is giving your Meshtastic network the capabilities of a satellite terminal, running on $30 hardware with zero monthly fees.
+The goal is giving your Meshtastic network the capabilities of a satellite terminal, running on $30 hardware with zero monthly fees. Dial-up speeds but on the mesh, peer-to-peer, ISP free. 
 
 ## Why This Exists
 
