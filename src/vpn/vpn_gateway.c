@@ -939,13 +939,15 @@ static void send_tcp_packet(DeadlightVPNManager *vpn, VPNSession *session,
     memset(ip_hdr, 0, ip_hdr_len);
     ip_hdr->version_ihl = 0x45; ip_hdr->total_length = htons(total_len);
     ip_hdr->ttl = 64; ip_hdr->protocol = IPPROTO_TCP;
-    ip_hdr->src_addr = dest_ip; ip_hdr->dest_addr = client_ip;
+    ip_hdr->src_addr = htonl(dest_ip); ip_hdr->dest_addr = htonl(client_ip);
+    ip_hdr->checksum = 0;
     ip_hdr->checksum = ip_checksum(ip_hdr, ip_hdr_len);
     memset(tcp_hdr, 0, tcp_hdr_len);
     tcp_hdr->src_port = htons(session->dest_port); tcp_hdr->dest_port = htons(session->client_port);
     tcp_hdr->seq_num = htonl(session->seq); tcp_hdr->ack_num = htonl(session->ack);
     tcp_hdr->data_offset_flags = (5 << 4); tcp_hdr->flags = flags; tcp_hdr->window_size = htons(65535);
     if (payload_len > 0 && payload) memcpy(packet + ip_hdr_len + tcp_hdr_len, payload, payload_len);
+    tcp_hdr->checksum = 0;
     tcp_hdr->checksum = tcp_checksum(ntohl(dest_ip), ntohl(client_ip), tcp_hdr, tcp_hdr_len + payload_len);
     gssize written = write(vpn->tun_fd, packet, total_len);
     if (written < 0 || (gsize)written != total_len) { log_warn("VPN: Failed/partial TUN write: %zd/%zu", written, total_len); return; }
@@ -971,12 +973,14 @@ static void send_udp_packet(DeadlightVPNManager *vpn, VPNUDPSession *session,
     memset(ip_hdr, 0, ip_hdr_len);
     ip_hdr->version_ihl = 0x45; ip_hdr->total_length = htons(total_len);
     ip_hdr->ttl = 64; ip_hdr->protocol = IPPROTO_UDP;
-    ip_hdr->src_addr = dest_ip; ip_hdr->dest_addr = client_ip;
+    ip_hdr->src_addr = htonl(dest_ip); ip_hdr->dest_addr = htonl(client_ip);
+    ip_hdr->checksum = 0;
     ip_hdr->checksum = ip_checksum(ip_hdr, ip_hdr_len);
     memset(udp_hdr, 0, udp_hdr_len);
     udp_hdr->src_port = htons(session->dest_port); udp_hdr->dest_port = htons(session->client_port);
     udp_hdr->length = htons(udp_hdr_len + payload_len);
     if (payload_len > 0 && payload) memcpy(packet + ip_hdr_len + udp_hdr_len, payload, payload_len);
+    udp_hdr->checksum = 0;
     udp_hdr->checksum = udp_checksum(ntohl(dest_ip), ntohl(client_ip), udp_hdr, udp_hdr_len + payload_len);
     gssize written = write(vpn->tun_fd, packet, total_len);
     if (written < 0) { log_warn("VPN: Failed to write UDP packet to TUN: %s", g_strerror(errno)); return; }

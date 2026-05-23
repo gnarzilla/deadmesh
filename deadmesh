@@ -14,8 +14,8 @@ worker_threads      = 8
 
 [ssl]
 enabled             = true
-ca_cert_file        = ~/.deadlight/ca.crt
-ca_key_file         = ~/.deadlight/ca.key
+ca_cert_file        = /home/thatch/.deadlight/ca.crt
+ca_key_file         = /home/thatch/.deadlight/ca.key
 ca_bundle           = /etc/ssl/certs/ca-certificates.crt
 cert_cache_dir      = /tmp/deadmesh_certs
 cert_cache_size     = 1000
@@ -56,7 +56,7 @@ connection_pool_reuse_ssl               = true
 # ─────────────────────────────────────────────────────────────
 [meshtastic]
 enabled             = true
-serial_port         = /dev/ttyUSB0
+serial_port         = /dev/ttyACM0
 baud_rate           = 115200
 mesh_node_id        = 0x00000000     # 0 = auto-detect from device
 channel_psk         =                # empty = default public channel
@@ -72,7 +72,7 @@ announce_interval   = 300            # seconds between gateway announcements
 # Set enabled=false if not running as root
 # ─────────────────────────────────────────────────────────────
 [vpn]
-enabled             = false          # flip to true when running sudo
+enabled             = true         
 tun_device          = tun0
 gateway_ip          = 10.8.0.1
 client_subnet       = 10.8.0.0/24
@@ -92,7 +92,7 @@ builtin_enabled     = true
 # ─────────────────────────────────────────────────────────────
 [plugin.meshtastic]
 enabled             = true
-serial_port         = /dev/tty/USB0   # must match [meshtastic] serial_port
+serial_port         = /dev/tty/ACM0   # must match [meshtastic] serial_port
 channel             = LongFast
 custom_port         = 100            # Meshtastic private portnum for proxy traffic
 
