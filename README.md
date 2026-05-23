@@ -3,26 +3,25 @@
 
 [Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
-**A resilient text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
+**A text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
 Part of the [Deadlight ecosystem](https://github.com/gnarzilla#deadlight-ecosystem) secure, performant, privacy-focused tools for resilient connectivity on low-bandwidth, high-latency, and intermittently connected networks.
 
-<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/mesh-cli-boot-4-26-26.gif" width="780" alt="CLI boot">
+<img src="https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/media/deadmesh_ui_v1.1.2.gif" width="540" alt="UI 1.1.2">
 
 ## Overview
 
-**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [deadlight-proxy](https://github.com/gnarzilla/deadlight-proxy) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols: HTTP/HTTPS, email, DNS, FTP; as if they had normal connectivity. The gateway-side pipeline is proven; client-side reassembly is in final testing.
+**deadmesh** transforms LoRa mesh networks into practical Internet gateways. Built on the [deadlight-proxy](https://github.com/gnarzilla/deadlight-proxy) foundation, it adds transparent mesh networking that lets any device on a Meshtastic mesh access standard Internet protocols: HTTP/HTTPS, email, DNS, FTP; as if they had normal connectivity. The gateway-side pipeline is proven; client-side reassembly is in testing.
 
 **What makes this different from other mesh solutions:**
 - Standard protocols work unchanged: browse websites, send email, use apps
 - Transparent fragmentation & reassembly over Meshtastic LoRa packets, with per-chunk unique packet IDs to defeat firmware-level deduplication on multi-chunk sessions
 - Full MITM proxy with caching, compression, ad-blocking, rate-limiting
 - Works with off-the-shelf Meshtastic hardware
-- Truly off-grid: solar-powered nodes can relay traffic across kilometers
 - Real-time embedded dashboard with live mesh visibility (nodes, SNR, positions, telemetry, chat)
 - Connection pooling + TLS session reuse to minimize airtime
 
-The goal is giving your Meshtastic network the capabilities of a satellite terminal, running on $30 hardware with zero monthly fees.
+The goal is giving your Meshtastic network the capabilities of a satellite terminal, running on $30 hardware with zero monthly fees. Dial-up speeds but on the mesh, peer-to-peer, ISP free. 
 
 ## Why This Exists
 
@@ -37,7 +36,7 @@ deadmesh sits in the middle:
 
 The key architectural insight is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, forever, without modification. Every protocol deadmesh adds benefits every application simultaneously.
 
-<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/webui_5.1.26.gif" width="780" alt="Full pipe flowing">
+<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/mesh-cli-boot-4-26-26.gif" width="540" alt="CLI boot">
 
 ### Critical Scenarios This Enables
 
@@ -64,7 +63,7 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
 - **Live Node Table**: Persistent mesh node database; names, hops, SNR, battery, position, last heard, updated from every packet type
 
-<img src="https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif" width="780" alt="Live Meshtastic Gateway">
+<img src="https://raw.githubusercontent.com/gnarzilla/deadmesh/main/src/assets/deadmesh-live.gif" width="540" alt="Live Meshtastic Gateway">
 
 ## Smart Mesh Routing – `mesh://` mode (Not yet implemented)
 
@@ -111,7 +110,7 @@ This makes deadmesh an exit ramp from the carrier model, not just a resilience t
 
 ## Getting Started
 
-<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/cli-boot-4-26-26.gif" width="780" alt="CLI compile & build">
+<img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/cli-boot-4-26-26.gif" width="540" alt="CLI compile & build">
 
 ### Prerequisites
 
