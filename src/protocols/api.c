@@ -103,6 +103,7 @@ static DeadlightHandlerResult api_send_404(DeadlightConnection *conn, GError **e
 /* JSON / metrics builders */
 static gchar *api_build_metrics_json(DeadlightContext *ctx);
 static gchar *api_build_dashboard_json(DeadlightContext *ctx);
+static gchar *api_build_nodes_json(DeadlightContext *ctx);
 
 /* HTTP fetch */
 static gchar *http_get_raw(const gchar *host, guint16 port, gboolean use_tls, const gchar *path, guint timeout_seconds, GError **error);
@@ -511,12 +512,10 @@ static gboolean validate_json_fields(JsonObject *obj,
 }
 
 /* =========================================================================
- * NODES ENDPOINT — /api/nodes
+ * NODES JSON BUILDER — shared by /api/nodes and SSE nodes_snapshot
  * ========================================================================= */
 
-static DeadlightHandlerResult api_handle_nodes_endpoint(DeadlightConnection *conn,
-                                                         GError **error) {
-    DeadlightContext *ctx = conn->context;
+static gchar *api_build_nodes_json(DeadlightContext *ctx) {
     gint64 now = (gint64)(g_get_real_time() / 1000000);
 
     JsonBuilder *builder = json_builder_new();
@@ -538,49 +537,34 @@ static DeadlightHandlerResult api_handle_nodes_endpoint(DeadlightConnection *con
             if (!n) continue;
 
             gint64 age_s = n->last_heard > 0 ? now - n->last_heard : -1;
-
-            /* Format node ID as 8-char hex string */
             gchar id_str[9];
             g_snprintf(id_str, sizeof(id_str), "%08x", n->node_id);
 
             json_builder_begin_object(builder);
-
             json_builder_set_member_name(builder, "id");
             json_builder_add_string_value(builder, id_str);
-
             json_builder_set_member_name(builder, "short");
             json_builder_add_string_value(builder, n->short_name);
-
             json_builder_set_member_name(builder, "long");
             json_builder_add_string_value(builder, n->long_name);
-
             json_builder_set_member_name(builder, "hops");
             json_builder_add_int_value(builder, (gint64)n->hops_away);
-
             json_builder_set_member_name(builder, "snr");
             json_builder_add_double_value(builder, (gdouble)n->snr);
-
             json_builder_set_member_name(builder, "battery");
             json_builder_add_int_value(builder, (gint64)n->battery_level);
-
             json_builder_set_member_name(builder, "has_position");
             json_builder_add_boolean_value(builder, n->has_position);
-
             json_builder_set_member_name(builder, "lat");
             json_builder_add_double_value(builder, n->has_position ? n->latitude  : 0.0);
-
             json_builder_set_member_name(builder, "lon");
             json_builder_add_double_value(builder, n->has_position ? n->longitude : 0.0);
-
             json_builder_set_member_name(builder, "last_heard");
             json_builder_add_int_value(builder, n->last_heard);
-
             json_builder_set_member_name(builder, "age_s");
             json_builder_add_int_value(builder, age_s);
-
             json_builder_set_member_name(builder, "is_local");
             json_builder_add_boolean_value(builder, n->is_local);
-
             json_builder_end_object(builder);
             total++;
         }
@@ -589,10 +573,8 @@ static DeadlightHandlerResult api_handle_nodes_endpoint(DeadlightConnection *con
     }
 
     json_builder_end_array(builder);
-
     json_builder_set_member_name(builder, "total");
     json_builder_add_int_value(builder, (gint64)total);
-
     json_builder_end_object(builder);
 
     JsonGenerator *gen = json_generator_new();
@@ -600,13 +582,22 @@ static DeadlightHandlerResult api_handle_nodes_endpoint(DeadlightConnection *con
     json_generator_set_root(gen, root);
     gchar *json = json_generator_to_data(gen, NULL);
 
-    DeadlightHandlerResult result =
-        api_send_json_response(conn, 200, "OK", json, error);
-
-    g_free(json);
     json_node_unref(root);
     g_object_unref(gen);
     g_object_unref(builder);
+    return json;
+}
+
+/* =========================================================================
+ * NODES ENDPOINT — /api/nodes
+ * ========================================================================= */
+
+static DeadlightHandlerResult api_handle_nodes_endpoint(DeadlightConnection *conn,
+                                                         GError **error) {
+    gchar *json = api_build_nodes_json(conn->context);
+    DeadlightHandlerResult result =
+        api_send_json_response(conn, 200, "OK", json, error);
+    g_free(json);
     return result;
 }
 
@@ -703,7 +694,7 @@ static DeadlightHandlerResult api_handle(DeadlightConnection *conn, GError **err
         gchar *preview = g_strndup((gchar *)conn->client_buffer->data,
                                 MIN(conn->client_buffer->len, 500));
 
-        g_debug("API conn %lu: Raw request (%zu bytes):\n%s",
+        g_debug("API conn %lu: Raw request (%u bytes):\n%s",
                 conn->id,
                 (guint)conn->client_buffer->len,
                 preview);
@@ -2081,6 +2072,25 @@ static gchar *api_build_metrics_json(DeadlightContext *ctx) {
         g_string_append(json, "\"rate_limiter\":null");
     }
 
+    if (ctx->mesh) {
+        g_string_append_printf(json,
+            ",\"mesh_stats\":{"
+            "\"packets_rx\":%"G_GUINT64_FORMAT","
+            "\"packets_tx\":%"G_GUINT64_FORMAT","
+            "\"packets_lost\":%"G_GUINT64_FORMAT","
+            "\"bytes_rx\":%"G_GUINT64_FORMAT","
+            "\"bytes_tx\":%"G_GUINT64_FORMAT","
+            "\"sessions_active\":%"G_GUINT64_FORMAT"}",
+            ctx->mesh->packets_received,
+            ctx->mesh->packets_sent,
+            ctx->mesh->packets_lost,
+            ctx->mesh->bytes_received,
+            ctx->mesh->bytes_sent,
+            ctx->mesh->sessions_active);
+    } else {
+        g_string_append(json, ",\"mesh_stats\":null");
+    }
+
     g_string_append(json, "}");
     return g_string_free(json, FALSE);
 }
@@ -2199,6 +2209,12 @@ static DeadlightHandlerResult api_handle_stream_endpoint(DeadlightConnection *co
     if (initial_json) {
         sse_send_event(client_os, "dashboard", initial_json, NULL);
         g_free(initial_json);
+    }
+
+    gchar *nodes_json = api_build_nodes_json(conn->context);
+    if (nodes_json) {
+        sse_send_event(client_os, "nodes_snapshot", nodes_json, NULL);
+        g_free(nodes_json);
     }
 
     SSEStreamState *state = g_new0(SSEStreamState, 1);

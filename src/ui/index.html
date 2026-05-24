@@ -641,12 +641,12 @@
         <div class="card-sub" id="sub-active">&nbsp;</div>
     </div>
     <div class="card">
-        <span class="card-label">Packets Relayed</span>
+        <span class="card-label">Mesh RX</span>
         <span class="card-value" id="val-total">—</span>
         <div class="card-sub" id="sub-total">&nbsp;</div>
     </div>
     <div class="card">
-        <span class="card-label">Bytes Bridged</span>
+        <span class="card-label">Mesh TX</span>
         <span class="card-value" id="val-bytes">—</span>
         <div class="card-sub" id="sub-bytes">&nbsp;</div>
     </div>
@@ -1026,8 +1026,12 @@ async function pollNodes() {
     } catch (_) {}
 }
 
-pollNodes();
-setInterval(pollNodes, 30000);
+let sseHealthy = false;
+
+pollMessages();
+
+setInterval(() => { if (!sseHealthy) pollNodes();    }, 60000);
+setInterval(() => { if (!sseHealthy) pollMessages(); }, 60000);
 
 // Age ticks client-side every second
 setInterval(() => {
@@ -1121,21 +1125,34 @@ async function pollMessages() {
     } catch (_) {}
 }
 
-pollMessages();
-setInterval(pollMessages, 30000);
-
 // ═══════════════════════════════════════════════════════════════════
 // DASHBOARD UPDATE
 // ═══════════════════════════════════════════════════════════════════
 function updateDashboard(data) {
     const m = data.metrics || {};
+    const ms = m.mesh_stats || null;
 
+    // Active Links — proxy connections
     const active = m.active_connections ?? '—';
     const total  = m.total_connections  ?? '—';
     document.getElementById('val-active').textContent = active + ' / ' + total;
-    document.getElementById('sub-active').textContent = total !== '—' ? total + ' lifetime' : '';
-    document.getElementById('val-total').textContent  = total;
-    document.getElementById('val-bytes').textContent  = formatBytes(m.bytes_transferred);
+    document.getElementById('sub-active').textContent =
+        total !== '—' ? total + ' lifetime' : '';
+
+    // Mesh RX — packets received from LoRa
+    document.getElementById('val-total').textContent =
+        ms ? ms.packets_rx : '—';
+    document.getElementById('sub-total').textContent =
+        ms ? formatBytes(ms.bytes_rx) : '';
+
+    // Mesh TX — packets sent over LoRa
+    document.getElementById('val-bytes').textContent =
+        ms ? ms.packets_tx : '—';
+    document.getElementById('sub-bytes').textContent =
+        ms ? formatBytes(ms.bytes_tx) + (ms.packets_lost > 0
+            ? '  ·  ' + ms.packets_lost + ' lost' : '') : '';
+
+    // Uptime
     document.getElementById('val-uptime').textContent = formatUptime(m.uptime);
     if (m.server_info && m.server_info.port) {
         document.getElementById('sub-uptime').textContent = 'port ' + m.server_info.port;
@@ -1224,6 +1241,23 @@ function connectSSE() {
         }
     });
 
+    eventSource.addEventListener('nodes_snapshot', e => {
+        try {
+            const data = JSON.parse(e.data);
+            (data.nodes || []).forEach(n => {
+                const now = Math.floor(Date.now() / 1000);
+                n.age_s = n.last_heard > 0 ? now - n.last_heard : -1;
+                nodeMap[n.id] = n;
+            });
+            renderNodes(Object.values(nodeMap));
+            document.getElementById('val-nodes').textContent = data.total ?? '—';
+            document.getElementById('sub-nodes').textContent =
+                data.total > 0 ? data.total + ' seen this session' : '';
+        } catch (err) {
+            console.error('[SSE] nodes_snapshot error:', err);
+        }
+    });
+
     eventSource.addEventListener('channel_info', e => {
         try {
             const ch = JSON.parse(e.data);
@@ -1239,10 +1273,12 @@ function connectSSE() {
     eventSource.onopen = () => {
         setStreamStatus('online');
         reconnectAttempts = 0;
+        sseHealthy = true;
     };
 
     eventSource.onerror = () => {
         eventSource.close();
+        sseHealthy = false;
         setStreamStatus('offline');
         reconnectAttempts++;
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);

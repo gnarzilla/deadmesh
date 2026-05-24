@@ -656,7 +656,6 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
         case meshtastic_FromRadio_packet_tag: {
             meshtastic_MeshPacket *pkt = &from_radio.payload_variant.packet;
 
-            /* ADD THIS */
             g_debug("client: packet_tag from=%08x to=%08x id=%08x portnum=%d variant=%d",
                     pkt->from, pkt->to, pkt->id,
                     (int)pkt->payload_variant.decoded.portnum,
@@ -668,6 +667,11 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
                                         pkt->from,
                                         (int32_t)pkt->hop_start - (int32_t)pkt->hop_limit,
                                         pkt->rx_snr);
+
+                if (context->mesh) {
+                    context->mesh->packets_received++;
+                    context->mesh->bytes_received += frame->len;
+                }
 
                 int portnum = pkt->payload_variant.decoded.portnum;
 
@@ -1261,6 +1265,11 @@ static gboolean send_chunk(MeshtasticPlugin *mp,
     if (written < 0 || (size_t)written != frame_len) {
         g_warning("Meshtastic: serial write failed: %s", g_strerror(errno));
         return FALSE;
+    }
+
+    if (conn->context && conn->context->mesh) {
+        conn->context->mesh->packets_sent++;
+        conn->context->mesh->bytes_sent += frame_len;
     }
 
     /* LONG_FAST airtime: ~500ms per 220-byte packet at SF9/BW250.
