@@ -57,7 +57,7 @@ The key is treating LoRa as a **dumb byte pipe** and putting all the intelligenc
 - **Live Mesh Visibility**: Decodes all Meshtastic packet types (text messages, positions, telemetry, node info, routing)
 - **Store-and-Forward**: Delay-tolerant networking for intermittent mesh connectivity (framework implemented, full DTN queuing in v1.3)
 - **Connection Pooling**: Reuses upstream connections aggressively with TLS session reuse to reduce LoRa airtime cost
-- **Plugin Extensibility**: Ad blocking, rate limiting, compression, caching, custom protocol handlers
+- **Plugin Extensibility**: Ad blocking, rate limiting, custom protocol handlers
 - **Hardware Flexibility**: USB serial, Bluetooth, or TCP-connected radios. Works on Raspberry Pi, x86 Linux, and WSL2 with USB/IP passthrough
 - **Auto-Detection**: Auto-discovers Meshtastic devices on serial ports and auto-detects local node ID from device
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
