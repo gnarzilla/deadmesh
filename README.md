@@ -53,7 +53,7 @@ The key is treating LoRa as a **dumb byte pipe** and putting all the intelligenc
 - **Transparent TLS Interception**: Inspect and cache HTTPS traffic with HTTP/1.1 ALPN negotiation to minimize mesh bandwidth
 - **Intelligent Fragmentation**: Automatically chunks large requests/responses into ~220-byte Meshtastic packets with unique per-chunk packet IDs; bypasses Meshtastic firmware's (from, id) deduplication that would silently drop all but the first chunk of multi-packet sessions
 - **Serial API Handshake**: Proper `want_config` initialization, auto-discovers node ID, receives full mesh state on startup
-- **Robust Serial Framing**: 0x94/0xC3 length-prefix state machine with sync recovery. If magic bytes are lost mid-stream, re-synchronizes automatically. This is what makes multi-hour uptime boring in the right way
+- **Robust Serial Framing**: 0x94/0xC3 length-prefix state machine with sync recovery. If magic bytes are lost mid-stream, re-synchronizes automatically. 
 - **Live Mesh Visibility**: Decodes all Meshtastic packet types (text messages, positions, telemetry, node info, routing)
 - **Store-and-Forward**: Delay-tolerant networking for intermittent mesh connectivity (framework implemented, full DTN queuing in v1.3)
 - **Connection Pooling**: Reuses upstream connections aggressively with TLS session reuse to reduce LoRa airtime cost
@@ -95,18 +95,6 @@ At full build-out, a well-seeded gateway holds more reference material than most
 Full details and philosophy → [SMART_MESH_ROUTING.md](docs/SMART_MESH_ROUTING.md)
 
 *(deadmesh should feel like the network is on your side.)*
-
-## The Bigger Picture
-
-deadmesh is a proxy today. But the architecture is designed for something more interesting: a **content-addressed network that happens to speak HTTP**.
-
-<details>
-Once a gateway has seen a piece of content, it costs zero airtime to serve it again, to anyone on the mesh, forever. Wikipedia's entire English text corpus is about 4GB as clean text. That fits on a Raspberry Pi SD card. A fully seeded gateway *is* Wikipedia, not a proxy to it; locally, instantly, with no uplink required. At that point the constraint shifts from bandwidth to curation, which is a much more human-solvable problem. That's what the [mesh librarian](#the-knowledge-appliance--mesh-librarians) model is really about.
-
-This makes deadmesh an exit ramp from the carrier model, not just a resilience tool. Disaster response and rural connectivity are real use cases, but so is the everyday one: **a $50 hardware investment that routes around the need for a cellular data plan**, for anything that isn't a live video call.
-
-> Voice is genuinely impossible at LoRa bitrates, even heavily compressed audio needs ~700 bps minimum, and LoRa LONG_FAST leaves ~3 kbps usable after overhead. But text, email, weather, maps, and cached web content? That's most of what a phone actually does.
-</details>
 
 ## Getting Started
 
