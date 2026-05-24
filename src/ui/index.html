@@ -715,7 +715,7 @@
     <div class="msg-log-panel" id="msg-panel" style="display:none;">
         <div class="panel-head">
             <span class="panel-head-label">Mesh Messages</span>
-            <span style="font-size:9px; color:var(--accent); letter-spacing:0.1em;" id="msg-channel">Channel / Primary</span>
+            <span style="font-size:9px; color:var(--accent); letter-spacing:0.1em;" id="msg-channel"> Channel / Primary</span>
             <span class="panel-head-meta" id="msg-count" style="margin-left:auto;">0 messages</span>
         </div>
         <div class="msg-scroll" id="msg-scroll">
@@ -731,7 +731,7 @@
             <span class="panel-head-label">Gateway Log</span>
             <button class="log-filter-btn active" id="filter-all"  onclick="setFilter('ALL')">ALL</button>
             <button class="log-filter-btn"        id="filter-info" onclick="setFilter('INFO')">INFO</button>
-            <button class="log-filter-btn"        id="filter-info" onclick="setFilter('MESH')">MESH</button>
+            <button class="log-filter-btn"        id="filter-mesh" onclick="setFilter('MESH')">MESH</button>
             <button class="log-filter-btn"        id="filter-warn" onclick="setFilter('WARN')">WARN</button>
             <button class="log-filter-btn"        id="filter-err"  onclick="setFilter('ERROR')">ERR</button>
             <span class="log-errcount zero" id="err-badge">0 errors</span>
@@ -830,6 +830,7 @@ function esc(t) {
 function shouldHide(level) {
     if (logFilter === 'ALL')   return false;
     if (logFilter === 'INFO')  return level === 'DEBUG';
+    if (logFilter === 'MESH') return !msg.toLowerCase().includes('mesh') && !msg.toLowerCase().includes('meshtastic');
     if (logFilter === 'WARN')  return level !== 'WARN' && level !== 'ERROR';
     if (logFilter === 'ERROR') return level !== 'ERROR';
     return false;
@@ -839,6 +840,7 @@ function setFilter(f) {
     logFilter = f;
     document.getElementById('filter-all').className  = 'log-filter-btn' + (f === 'ALL'   ? ' active' : '');
     document.getElementById('filter-info').className = 'log-filter-btn' + (f === 'INFO'  ? ' active' : '');
+    document.getElementById('filter-mesh').className = 'log-filter-btn' + (f === 'MESH'  ? ' active' : '');
     document.getElementById('filter-warn').className = 'log-filter-btn' + (f === 'WARN'  ? ' active-warn' : '');
     document.getElementById('filter-err').className  = 'log-filter-btn' + (f === 'ERROR' ? ' active-err'  : '');
     document.querySelectorAll('.log-line[data-level]').forEach(el => {

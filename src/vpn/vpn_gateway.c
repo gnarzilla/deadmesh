@@ -948,7 +948,7 @@ static void send_tcp_packet(DeadlightVPNManager *vpn, VPNSession *session,
     tcp_hdr->data_offset_flags = (5 << 4); tcp_hdr->flags = flags; tcp_hdr->window_size = htons(65535);
     if (payload_len > 0 && payload) memcpy(packet + ip_hdr_len + tcp_hdr_len, payload, payload_len);
     tcp_hdr->checksum = 0;
-    tcp_hdr->checksum = tcp_checksum(ntohl(dest_ip), ntohl(client_ip), tcp_hdr, tcp_hdr_len + payload_len);
+    tcp_hdr->checksum = tcp_checksum(dest_ip, client_ip, tcp_hdr, tcp_hdr_len + payload_len);
     gssize written = write(vpn->tun_fd, packet, total_len);
     if (written < 0 || (gsize)written != total_len) { log_warn("VPN: Failed/partial TUN write: %zd/%zu", written, total_len); return; }
     vpn->bytes_sent += (guint64)written;
@@ -981,7 +981,7 @@ static void send_udp_packet(DeadlightVPNManager *vpn, VPNUDPSession *session,
     udp_hdr->length = htons(udp_hdr_len + payload_len);
     if (payload_len > 0 && payload) memcpy(packet + ip_hdr_len + udp_hdr_len, payload, payload_len);
     udp_hdr->checksum = 0;
-    udp_hdr->checksum = udp_checksum(ntohl(dest_ip), ntohl(client_ip), udp_hdr, udp_hdr_len + payload_len);
+    udp_hdr->checksum = udp_checksum(dest_ip, client_ip, udp_hdr, udp_hdr_len + payload_len);
     gssize written = write(vpn->tun_fd, packet, total_len);
     if (written < 0) { log_warn("VPN: Failed to write UDP packet to TUN: %s", g_strerror(errno)); return; }
     vpn->bytes_sent += written;
@@ -1108,6 +1108,16 @@ static void handle_tcp_packet(DeadlightVPNManager *vpn, struct ip_header *ip_hdr
     gchar *key = make_session_key(&client_ip6, client_port, &dest_ip6, dest_port);
     g_mutex_lock(&vpn->sessions_mutex);
     VPNSession *session = g_hash_table_lookup(vpn->sessions, key);
+    if (session &&
+        session->state == VPN_TCP_SYN_RECEIVED &&
+        (flags & TCP_SYN) &&
+        !(flags & TCP_ACK)) {
+        send_tcp_packet(vpn, session, TCP_SYN | TCP_ACK, NULL, 0);
+
+        g_mutex_unlock(&vpn->sessions_mutex);
+        g_free(key);
+        return;
+    }
     if (!session && (flags & TCP_SYN) && !(flags & TCP_ACK)) {
         if (vpn->active_connections >= 1000) { g_mutex_unlock(&vpn->sessions_mutex); g_free(key); return; }
         session = vpn_session_new(vpn, client_ip, client_port, dest_ip, dest_port);

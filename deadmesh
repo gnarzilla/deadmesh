@@ -69,7 +69,7 @@ announce_interval   = 300            # seconds between gateway announcements
 
 # ─────────────────────────────────────────────────────────────
 # VPN gateway — requires root / CAP_NET_ADMIN
-# Set enabled=false if not running as root
+# 
 # ─────────────────────────────────────────────────────────────
 [vpn]
 enabled             = true         
@@ -78,6 +78,14 @@ gateway_ip          = 10.8.0.1
 client_subnet       = 10.8.0.0/24
 netmask             = 255.255.255.0
 dns_servers         = 8.8.8.8,8.8.4.4
+
+[egress]
+mode = direct          # direct | socks5 | http_connect | mesh
+host =
+port =
+username =
+password =
+bind_interface =
 
 [plugins]
 enabled             = true
