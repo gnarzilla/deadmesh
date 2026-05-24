@@ -827,12 +827,13 @@ function esc(t) {
 // ═══════════════════════════════════════════════════════════════════
 // LOG FILTER
 // ═══════════════════════════════════════════════════════════════════
-function shouldHide(level) {
+function shouldHide(level, msgText) {
     if (logFilter === 'ALL')   return false;
     if (logFilter === 'INFO')  return level === 'DEBUG';
-    if (logFilter === 'MESH') return !msg.toLowerCase().includes('mesh') && !msg.toLowerCase().includes('meshtastic');
-    if (logFilter === 'WARN')  return level !== 'WARN' && level !== 'ERROR';
-    if (logFilter === 'ERROR') return level !== 'ERROR';
+    if (logFilter === 'MESH')  return level !== 'MESH' &&
+                                      !(msgText || '').toLowerCase().includes('mesh');
+    if (logFilter === 'WARN')  return level !== 'WARN'  && level !== 'ERROR' && level !== 'ERR';
+    if (logFilter === 'ERROR') return level !== 'ERROR' && level !== 'ERR';
     return false;
 }
 
@@ -844,7 +845,7 @@ function setFilter(f) {
     document.getElementById('filter-warn').className = 'log-filter-btn' + (f === 'WARN'  ? ' active-warn' : '');
     document.getElementById('filter-err').className  = 'log-filter-btn' + (f === 'ERROR' ? ' active-err'  : '');
     document.querySelectorAll('.log-line[data-level]').forEach(el => {
-        el.classList.toggle('hidden', shouldHide(el.dataset.level));
+        el.classList.toggle('hidden', shouldHide(el.dataset.level, el.dataset.msg));
     });
 }
 
@@ -857,40 +858,6 @@ function updateErrorBadge() {
 // ═══════════════════════════════════════════════════════════════════
 // LOG RENDERING
 // ═══════════════════════════════════════════════════════════════════
-function renderLogLine(raw) {
-    // Format: "2026-05-22 10:36:42 [INFO] deadmesh: message"
-    //     or: "2026-05-22 10:36:42 [INFO ] deadmesh: message"
-    const m = raw.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[\s*(\w+)\s*\](?:\s(\w+):)?\s(.*)$/);
-    if (!m) {
-        return `<span class="log-line"><span class="src">${esc(raw)}</span></span>`;
-    }
-    const [, ts, level, src, msg] = m;
-    const lvl = level.trim();
-
-    if (lvl === 'WARN' || lvl === 'ERROR') {
-        errorCount++;
-        updateErrorBadge();
-    }
-
-    let rich = esc(msg)
-        .replace(/(Connection \d+)/g,           '<span class="hl-conn">$1</span>')
-        .replace(/([a-zA-Z0-9][-a-zA-Z0-9.]+\.[a-z]{2,}:\d+)/g, '<span class="hl-host">$1</span>')
-        .replace(/(LoRa|mesh|fragment|relay)/gi, '<span class="hl-lora">$1</span>')
-        .replace(/([0-9a-f]{8})/g,              '<span class="hl-hex">$1</span>');
-
-    const isWarn = lvl === 'WARN';
-    const isErr  = lvl === 'ERROR';
-    const extra  = isErr ? ' is-err' : isWarn ? ' is-warn' : '';
-    const hidden = shouldHide(lvl) ? ' hidden' : '';
-
-    return `<div class="log-line${extra}${hidden}" data-level="${lvl}">` +
-        `<span class="ts">${ts} </span>` +
-        `<span class="lvl-${lvl}">[${lvl}]</span> ` +
-        (src ? `<span class="src">${esc(src)}: </span>` : '') +
-        `<span>${rich}</span>` +
-        `</div>`;
-}
-
 function appendLogs(logs) {
     if (!logs.length) return;
     let newLogs = logs;
@@ -914,6 +881,41 @@ function appendLogs(logs) {
     if (document.getElementById('auto-scroll').checked) {
         term.scrollTop = term.scrollHeight;
     }
+}
+
+function renderLogLine(raw) {
+    // Format: "2026-05-22 10:36:42 [INFO] deadmesh: message"
+    //     or: "2026-05-22 10:36:42 [INFO ] deadmesh: message"
+    const m = raw.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[\s*(\w+)\s*\](?:\s(\w+):)?\s(.*)$/);
+    if (!m) {
+        return `<span class="log-line"><span class="src">${esc(raw)}</span></span>`;
+    }
+    const [, ts, level, src, msg] = m;
+    const lvl = level.trim();
+
+    if (lvl === 'ERROR') {   // fix: was counting WARN as errors
+        errorCount++;
+        updateErrorBadge();
+    }
+
+    let rich = esc(msg)
+        .replace(/(Connection \d+)/g,           '<span class="hl-conn">$1</span>')
+        .replace(/([a-zA-Z0-9][-a-zA-Z0-9.]+\.[a-z]{2,}:\d+)/g, '<span class="hl-host">$1</span>')
+        .replace(/(LoRa|mesh|fragment|relay)/gi, '<span class="hl-lora">$1</span>')
+        .replace(/([0-9a-f]{8})/g,              '<span class="hl-hex">$1</span>');
+
+    const isWarn = lvl === 'WARN';
+    const isErr  = lvl === 'ERROR';
+    const extra  = isErr ? ' is-err' : isWarn ? ' is-warn' : '';
+    const hidden = shouldHide(lvl, msg) ? ' hidden' : '';
+
+    // store raw msg text in data-msg so setFilter can re-evaluate MESH filter on existing lines
+    return `<div class="log-line${extra}${hidden}" data-level="${lvl}" data-msg="${esc(msg)}">` +
+        `<span class="ts">${ts} </span>` +
+        `<span class="lvl-${lvl}">[${lvl}]</span> ` +
+        (src ? `<span class="src">${esc(src)}: </span>` : '') +
+        `<span>${rich}</span>` +
+        `</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
