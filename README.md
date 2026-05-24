@@ -1,7 +1,7 @@
 # deadmesh
 <img src="https://deadmesh.boo/apple-touch-icon.png" width="32" height="32">
 
-[Project Blog](https://deadmesh.boo) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
+[Project Blog](https://deadmesh.boo) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
 **A text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
