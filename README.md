@@ -38,10 +38,10 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 
 <img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/mesh-cli-boot-4-26-26.gif" width="540" alt="CLI boot">
 
-### Critical Scenarios This Enables
+### Critical Scenarios This Aims to Enable
 
 - **Disaster Response**: Coordinate rescue operations when cell towers are down
-- **Rural Connectivity**: Share one satellite uplink across dozens of kilometers
+- **Rural Connectivity**: Share one satellite uplink across the mesh
 - **Censorship Resistance**: Maintain communication during Internet blackouts
 - **Off-Grid Networks**: Festival/protest/research networks that disappear when powered off
 - **Development Projects**: Bring Internet services to areas with zero infrastructure
@@ -51,7 +51,7 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 
 - **Universal Protocol Support**(selectively practical): HTTP/HTTPS, SMTP/IMAP, SOCKS4/5, WebSocket, FTP; all verified through the proxy, with mesh transport for each protocol as the LoRa path completes end-to-end testing
 - **Transparent TLS Interception**: Inspect and cache HTTPS traffic with HTTP/1.1 ALPN negotiation to minimize mesh bandwidth
-- **Intelligent Fragmentation**: Automatically chunks large requests/responses into ~220-byte Meshtastic packets with unique per-chunk packet IDs — bypasses Meshtastic firmware's (from, id) deduplication that would silently drop all but the first chunk of multi-packet sessions
+- **Intelligent Fragmentation**: Automatically chunks large requests/responses into ~220-byte Meshtastic packets with unique per-chunk packet IDs; bypasses Meshtastic firmware's (from, id) deduplication that would silently drop all but the first chunk of multi-packet sessions
 - **Serial API Handshake**: Proper `want_config` initialization, auto-discovers node ID, receives full mesh state on startup
 - **Robust Serial Framing**: 0x94/0xC3 length-prefix state machine with sync recovery. If magic bytes are lost mid-stream, re-synchronizes automatically. This is what makes multi-hour uptime boring in the right way
 - **Live Mesh Visibility**: Decodes all Meshtastic packet types (text messages, positions, telemetry, node info, routing)
@@ -755,9 +755,15 @@ Every packet received updates the in-memory node table keyed by node ID. The tab
 - [x] SSE stream stability (cross-thread write fix, 100+ hour uptime confirmed)
 - [x] TCP keepalive + stale connection detection (HUP/ERR pre-check)
 - [x] UTF-8/emoji correct JSON escaping in node names and messages
-- [x] Ghost connection cleanup (Chrome prefetch/prerender connections detected and cleaned within 2s)
 - [x] **Per-chunk unique packet IDs**: defeats Meshtastic firmware (from, id) deduplication that silently dropped all but the first chunk of multi-packet sessions — required for large HTTP responses to survive multi-chunk LoRa transmission
 - [x] 12-byte chunk header (`logical_session_id + seq + total`) decouples session identity from firmware packet routing
+- [x] /api/messages endpoint: mesh text message history as JSON
+- [x] SSE-first architecture: node_update, message, channel_info, nodes_snapshot events
+      eliminate REST polling during normal operation
+- [x] Mesh packet stats: packets_rx, packets_tx, bytes_rx, bytes_tx tracked in DeadlightMeshManager
+      and exposed via /api/metrics
+- [x] Dashboard stat cards: Mesh RX / Mesh TX replace generic proxy counters
+- [x] Ghost connection cleanup (Chrome prefetch/prerender connections detected and cleaned within 2s)
 
 ### v1.2 (Next)
 - [ ] End-to-end proxy session test over real LoRa
