@@ -34,7 +34,7 @@ deadmesh sits in the middle:
 
 **Target result**: Your mesh network works with everything: email clients, web browsers, update tools, API services; without modifying a single line of application code. The gateway proxy pipeline achieves this today; the remaining work is client-side packet delivery over LoRa.
 
-The key architectural insight is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, forever, without modification. Every protocol deadmesh adds benefits every application simultaneously.
+The key is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, without modification. Every protocol deadmesh adds benefits every application simultaneously.
 
 <img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/mesh-cli-boot-4-26-26.gif" width="540" alt="CLI boot">
 
