@@ -103,9 +103,9 @@ static size_t pb_encode_tag_message(uint8_t *buf, uint32_t field,
 static size_t encode_data_msg(uint8_t *buf, size_t buf_len,
                                uint32_t portnum,
                                const uint8_t *payload, size_t payload_len) {
-    (void)buf_len;
     size_t n = 0;
     n += pb_encode_tag_varint(buf + n, 1, portnum);             /* field 1: portnum */
+    if (payload_len > buf_len || n + payload_len > buf_len) return 0; /* bounds check */
     n += pb_encode_tag_bytes(buf + n, 2, payload, payload_len); /* field 2: payload */
     return n;
 }
