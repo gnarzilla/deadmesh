@@ -77,6 +77,7 @@ void deadlight_log_handler(const gchar *log_domain, GLogLevelFlags log_level,
         case DEADLIGHT_LOG_WARNING: level_str = "WARN "; color_code = "\033[33m"; break; // Yellow
         case DEADLIGHT_LOG_INFO:    level_str = "INFO "; color_code = "\033[32m"; break; // Green
         case DEADLIGHT_LOG_DEBUG:   level_str = "DEBUG"; color_code = "\033[36m"; break; // Cyan
+        case DEADLIGHT_LOG_MESH: level_str = "MESH "; color_code = "\033[35m"; break; // Magenta
         default: break;
     }
 
@@ -158,6 +159,8 @@ gboolean deadlight_logging_init(DeadlightContext *context, GError **error) {
         current_log_level = DEADLIGHT_LOG_INFO;
     } else if (g_strcmp0(log_level_str, "debug") == 0) {
         current_log_level = DEADLIGHT_LOG_DEBUG;
+    } else if (g_strcmp0(log_level_str, "mesh") == 0) {
+        current_log_level = DEADLIGHT_LOG_MESH;
     }
     g_free(log_level_str);
     
@@ -202,6 +205,4 @@ void deadlight_logging_cleanup(DeadlightContext *context) {
     g_mutex_unlock(&web_log_mutex);
     g_mutex_clear(&web_log_mutex);
     
-    // Note: Can't easily use g_info here as handler might be invalid, 
-    // but usually cleanup happens at very end.
 }

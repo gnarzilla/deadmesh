@@ -48,6 +48,8 @@ struct _MeshSession {
     uint32_t        session_id;     /* Per-node monotonic session counter   */
     gchar          *key;            /* "nodeid:sessionid" — hash table key  */
 
+    GMutex          lock;          /* protects all fields below      */
+
     /* Routing */
     DeadlightConnection *conn;      /* NULL until ACTIVE                    */
 
@@ -57,6 +59,7 @@ struct _MeshSession {
     uint32_t        received_chunks;
     uint32_t       *chunk_bitmap;   /* received[i] = chunk i arrived        */
     uint32_t        bitmap_words;   /* ceil(expected_chunks / 32)           */
+    gsize           fragment_size;
 
     /* State */
     MeshSessionState state;
@@ -149,7 +152,7 @@ guint mesh_session_expire(MeshSessionTable *table);
  * Initialise the reassembly bitmap for a session.
  * Must be called once total_chunks is known (from first packet header).
  */
-bool mesh_session_init_reassembly(MeshSession *session, uint32_t total_chunks);
+bool mesh_session_init_reassembly(MeshSession *session, uint32_t total_chunks, gsize fragment_size);
 
 /**
  * Record arrival of chunk @seq_num.
@@ -168,6 +171,8 @@ bool mesh_session_has_chunk(const MeshSession *session, uint32_t seq_num);
  * Caller owns the returned string (g_free it).
  */
 gchar *mesh_session_make_key(uint32_t src_node_id, uint32_t session_id);
+void mesh_session_lock   (MeshSession *session);
+void mesh_session_unlock (MeshSession *session);
 
 #ifdef __cplusplus
 }

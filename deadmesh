@@ -10,7 +10,7 @@ connection_timeout  = 30
 buffer_size         = 65536
 log_level           = debug
 log_file            =
-worker_threads      = 8
+worker_threads      = 16
 
 [ssl]
 enabled             = true

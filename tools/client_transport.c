@@ -538,7 +538,7 @@ static void handle_incoming_frame(ClientTransport *ct,
         ct->sessions, ct->gateway_node_id, logical_session_id);
 
     if (seq_num == 0 || session->expected_chunks == 0)
-        mesh_session_init_reassembly(session, total_chunks);
+        mesh_session_init_reassembly(session, total_chunks, 220);
 
     bool complete = mesh_session_record_chunk(
         session, seq_num, chunk_data, chunk_len);
@@ -561,7 +561,7 @@ static void handle_incoming_frame(ClientTransport *ct,
                   logical_session_id);
     }
 
-    mesh_session_init_reassembly(session, 0);
+    mesh_session_init_reassembly(session, 0, 220);
 }
 
 /* ─────────────────────────────────────────────────────────────

@@ -465,11 +465,14 @@ static gboolean meshtastic_init(DeadlightContext *context) {
 
     g_mutex_init(&mp->write_mutex);
     mp->running = TRUE;
-
     if (mp->serial_fd >= 0) {
+        mp->reader_thread = g_thread_new("mesh-reader",
+                                        reader_thread_func, mp);
+        /* Give the thread a moment to enter its read loop before
+        * we trigger the device to start streaming.              */
+        g_usleep(50 * 1000);
         if (!send_want_config(mp)) {
-            g_warning("Meshtastic: want_config handshake failed — "
-                      "device may not stream packets");
+            g_warning("Meshtastic: want_config handshake failed");
         }
     }
 
@@ -1083,7 +1086,7 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
         mp->sessions, src_node, logical_session_id);
 
     if (seq_num == 0 || session->expected_chunks == 0) {
-        mesh_session_init_reassembly(session, total_chunks);
+        mesh_session_init_reassembly(session, total_chunks, 220);
     }
 
     bool complete = FALSE;  // Declare here so visible in new block
@@ -1123,7 +1126,8 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
 
         /* Attach to session */
         session->user_data = mesh_io;
-        session->conn = new_conn;
+        /* was: session->conn = new_conn; */
+        mesh_session_assign_conn(mp->sessions, session, new_conn);
 
         /* Queue to worker pool */
         GError *push_err = NULL;
@@ -1170,14 +1174,23 @@ static void handle_incoming_frame(MeshtasticPlugin *mp,
         return;
     }
 
-    g_byte_array_append(session->conn->client_buffer,
-                        session->assembly_buf->data,
-                        session->assembly_buf->len);
+    /* was: g_byte_array_append(session->conn->client_buffer, ...) */
+    mesh_session_lock(session);
+    MeshStream *ms = session->user_data ? MESH_STREAM(session->user_data) : NULL;
+    mesh_session_unlock(session);
 
+    if (ms) {
+        mesh_stream_push_data(ms,
+                            session->assembly_buf->data,
+                            session->assembly_buf->len);
+    } else {
+        g_warning("Session %08x:%08x complete but no MeshStream attached",
+                src_node, logical_session_id);
+    }
     g_info("Meshtastic: injected %u reassembled bytes into conn %lu",
             session->assembly_buf->len, session->conn->id);
 
-    mesh_session_init_reassembly(session, 0);
+    mesh_session_init_reassembly(session, 0, 220);
     (void)context;
 }
 
@@ -1218,6 +1231,7 @@ static gboolean send_chunk(MeshtasticPlugin *mp,
     packet.from                  = mp->local_node_id;
     packet.to                    = conn->mesh_source_node;
     packet.channel               = 0;
+    packet.want_ack              = true; 
     packet.id                    = (uint32_t)g_random_int();
     packet.hop_limit             = 3;
 
@@ -1259,8 +1273,6 @@ static gboolean send_chunk(MeshtasticPlugin *mp,
     g_mutex_lock(&mp->write_mutex);
     ssize_t written = write(mp->serial_fd, frame_buf, frame_len);
     g_mutex_unlock(&mp->write_mutex);
-
-    packet.want_ack = true;
 
     if (written < 0 || (size_t)written != frame_len) {
         g_warning("Meshtastic: serial write failed: %s", g_strerror(errno));

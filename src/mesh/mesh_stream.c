@@ -246,22 +246,21 @@ static gboolean mesh_stream_close_impl(GIOStream *stream,
     MeshStreamPrivate *priv = self->priv;
 
     g_mutex_lock(&priv->close_mutex);
-    if (!priv->closed) {
+    gboolean already_closed = priv->closed;
+    if (!already_closed) {
         priv->closed = TRUE;
-
-        /* Close the write end of the pipe — this signals EOF to any
-         * blocked read() on the read end.                            */
         if (priv->pipe_write_fd >= 0) {
             close(priv->pipe_write_fd);
             priv->pipe_write_fd = -1;
         }
+    }
+    g_mutex_unlock(&priv->close_mutex);  /* ← release before blocking */
 
+    if (!already_closed) {
         g_input_stream_close(priv->input_stream,   cancellable, error);
         g_output_stream_close(priv->output_stream, cancellable, NULL);
     }
-    g_mutex_unlock(&priv->close_mutex);
 
-    /* Chain to parent */
     return G_IO_STREAM_CLASS(mesh_stream_parent_class)
                ->close_fn(stream, cancellable, error);
 }
@@ -270,10 +269,13 @@ static void mesh_stream_finalize(GObject *object) {
     MeshStream *self = MESH_STREAM(object);
     MeshStreamPrivate *priv = self->priv;
 
-    /* Ensure both pipe fds are closed */
     if (priv->pipe_write_fd >= 0) {
         close(priv->pipe_write_fd);
         priv->pipe_write_fd = -1;
+    }
+    if (priv->pipe_read_fd >= 0) {   /* ← add */
+        close(priv->pipe_read_fd);
+        priv->pipe_read_fd = -1;
     }
 
     g_clear_object(&priv->input_stream);
