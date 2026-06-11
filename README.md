@@ -1,7 +1,7 @@
 # deadmesh
 <img src="https://deadmesh.boo/apple-touch-icon.png" width="32" height="32">
 
-[Project Blog](https://deadmesh.boo) · [Why This Exists](#why-this-exists) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Real-World Use Cases](docs/USE_CASES.md) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
+[Project Blog](https://deadmesh.boo) · [Getting Started](#getting-started) · [Hardware](#hardware) · [Dashboard](#dashboard) · [Usage](#usage) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Performance](#performance) · [Roadmap](#roadmap) · [License](#license)
 
 **A text-first Internet bridge for mesh radios: Update your blog from a can on a string from the smoldering rubble.**
 
@@ -34,7 +34,7 @@ deadmesh sits in the middle:
 
 **Target result**: Your mesh network works with everything: email clients, web browsers, update tools, API services; without modifying a single line of application code. The gateway proxy pipeline achieves this today; the remaining work is client-side packet delivery over LoRa.
 
-The key architectural insight is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. This is the same move that made TCP/IP win over every purpose-built network protocol in the 1980s. Everything that speaks HTTP already works, forever, without modification. Every protocol deadmesh adds benefits every application simultaneously.
+The key is treating LoRa as a **dumb byte pipe** and putting all the intelligence in the proxy layer above it. Everything that speaks HTTP already works, without modification. Every protocol deadmesh adds benefits every application simultaneously.
 
 <img src="https://github.com/gnarzilla/deadmesh/blob/4726bfadbb43c9f307abcf54bdc8f99af5b133da/src/assets/media/mesh-cli-boot-4-26-26.gif" width="540" alt="CLI boot">
 
@@ -53,11 +53,11 @@ The key architectural insight is treating LoRa as a **dumb byte pipe** and putti
 - **Transparent TLS Interception**: Inspect and cache HTTPS traffic with HTTP/1.1 ALPN negotiation to minimize mesh bandwidth
 - **Intelligent Fragmentation**: Automatically chunks large requests/responses into ~220-byte Meshtastic packets with unique per-chunk packet IDs; bypasses Meshtastic firmware's (from, id) deduplication that would silently drop all but the first chunk of multi-packet sessions
 - **Serial API Handshake**: Proper `want_config` initialization, auto-discovers node ID, receives full mesh state on startup
-- **Robust Serial Framing**: 0x94/0xC3 length-prefix state machine with sync recovery. If magic bytes are lost mid-stream, re-synchronizes automatically. This is what makes multi-hour uptime boring in the right way
+- **Robust Serial Framing**: 0x94/0xC3 length-prefix state machine with sync recovery. If magic bytes are lost mid-stream, re-synchronizes automatically. 
 - **Live Mesh Visibility**: Decodes all Meshtastic packet types (text messages, positions, telemetry, node info, routing)
 - **Store-and-Forward**: Delay-tolerant networking for intermittent mesh connectivity (framework implemented, full DTN queuing in v1.3)
 - **Connection Pooling**: Reuses upstream connections aggressively with TLS session reuse to reduce LoRa airtime cost
-- **Plugin Extensibility**: Ad blocking, rate limiting, compression, caching, custom protocol handlers
+- **Plugin Extensibility**: Ad blocking, rate limiting, custom protocol handlers
 - **Hardware Flexibility**: USB serial, Bluetooth, or TCP-connected radios. Works on Raspberry Pi, x86 Linux, and WSL2 with USB/IP passthrough
 - **Auto-Detection**: Auto-discovers Meshtastic devices on serial ports and auto-detects local node ID from device
 - **Embedded Dashboard**: Real-time gateway monitor with SSE streaming, self-contained in the binary, no external assets
@@ -95,18 +95,6 @@ At full build-out, a well-seeded gateway holds more reference material than most
 Full details and philosophy → [SMART_MESH_ROUTING.md](docs/SMART_MESH_ROUTING.md)
 
 *(deadmesh should feel like the network is on your side.)*
-
-## The Bigger Picture
-
-deadmesh is a proxy today. But the architecture is designed for something more interesting: a **content-addressed network that happens to speak HTTP**.
-
-<details>
-Once a gateway has seen a piece of content, it costs zero airtime to serve it again, to anyone on the mesh, forever. Wikipedia's entire English text corpus is about 4GB as clean text. That fits on a Raspberry Pi SD card. A fully seeded gateway *is* Wikipedia, not a proxy to it; locally, instantly, with no uplink required. At that point the constraint shifts from bandwidth to curation, which is a much more human-solvable problem. That's what the [mesh librarian](#the-knowledge-appliance--mesh-librarians) model is really about.
-
-This makes deadmesh an exit ramp from the carrier model, not just a resilience tool. Disaster response and rural connectivity are real use cases, but so is the everyday one: **a $50 hardware investment that routes around the need for a cellular data plan**, for anything that isn't a live video call.
-
-> Voice is genuinely impossible at LoRa bitrates, even heavily compressed audio needs ~700 bps minimum, and LoRa LONG_FAST leaves ~3 kbps usable after overhead. But text, email, weather, maps, and cached web content? That's most of what a phone actually does.
-</details>
 
 ## Getting Started
 

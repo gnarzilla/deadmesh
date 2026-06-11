@@ -30,14 +30,14 @@ This gives users **explicit intent** and removes all guesswork.
 Instead of silent timeouts or ugly 404s, deadmesh gives **helpful, honest, and occasionally fun** responses.
 
 **Example – trying to watch YouTube over LoRa:**
-
+Legend: ☑ Pass · ☒ Fail ·⚠ Partial / Known Issue · ☐ Not Yet Tested · N/A Not Applicable
 ```
-❌ youtube.com is not available over mesh
+☒ youtube.com is not available over mesh
 
    Estimated time: ~47 hours
    Duty-cycle used: 312% of daily limit
 
-✅ Try these mesh-friendly alternatives instead:
+☑ Try these mesh-friendly alternatives instead:
    • mesh://en.wikipedia.org/wiki/YouTube
    • mesh://invidious.io  (lightweight YouTube frontend)
    • mesh://yt.odysee.com
@@ -108,18 +108,12 @@ warm_on_boot = true
 show_alternatives = true
 ```
 
-## Next steps for you
+## UX
 
-1. Try `mesh://` on any link — you’ll immediately feel the difference.
+1. Try `mesh://` on any link
 2. Seed your local gateway with a few important pages (weather, Wikipedia survival articles, local maps).
 3. Become a mesh librarian — load a USB stick and go for a walk.
 
 ---
 
-**This is how deadmesh turns painful LoRa limitations into a delightful, human-centered experience.**
 
-The mesh doesn’t have to feel like a downgrade.  
-With `mesh://` + smart routing + helpful denials + shared cache, it feels like the network is **on your side**.
-
-— gnarzilla
----
